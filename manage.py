@@ -3,6 +3,7 @@ import os
 import json
 import threading
 import random
+import time
 
 class FTP_Handler():
     def __init__(self,root) -> None:
@@ -13,7 +14,16 @@ class FTP_Handler():
 
     def handle_list(self, client_socket):
         file_list=os.listdir(self.current_dir)
-        response = '\n'.join(file_list) + '\r\n'
+        response=''
+        for item in file_list:
+            item_path = os.path.join(self.current_dir, item)
+            item_stat = os.stat(item_path)
+            item_type = 'd' if os.path.isdir(item_path) else '-'
+            item_permissions = oct(item_stat.st_mode)[-3:]  # Permisos en formato octal
+            item_size = item_stat.st_size
+            item_date = time.strftime('%b %d %Y %H:%M', time.localtime(item_stat.st_mtime))
+            response += f'{item_type}{item_permissions} 1 user group {item_size} {item_date} {item}\r\n'
+        
         if self.data_connection:
             self.data_connection.sendall(response.encode())
             self.data_connection.close()
@@ -89,8 +99,8 @@ class FTP_Handler():
 
     def handle_port(self,client_socket, args):
         ip_parts = args.split(',')
-        ip_address = '.'.join(ip_parts)
-        port = int(ip_address[-2]) * 256 + int(ip_address[-1])
+        ip_address = '.'.join(ip_parts[:4])
+        port = int(ip_parts[4]) * 256 + int(ip_parts[5])
         
         self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.data_socket.connect((ip_address, port))
@@ -124,6 +134,7 @@ class FTP_Server():
         self.ftp_socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.authenticated = {}
         self.current_user = {}
+        
 
     def handle_client(self,client_socket):
         client_socket.sendall(b'220 FTP Server Ready\r\n')
@@ -165,25 +176,28 @@ class FTP_Server():
                     client_socket.sendall(b'530 Please login with USER and PASS\r\n')
             elif command == 'RETR':
                 if self.authenticated.get(client_socket, False):
-                    filename = args[0]
+                    filename = args[1]
                     handler.handle_download(client_socket, filename)
                 else:
                     client_socket.sendall(b'530 Please login with USER and PASS\r\n')
             elif command == 'STOR':
                 if self.authenticated.get(client_socket, False):
-                    filename = args[0]
+                    filename=''
+                    for arg in args:
+                        filename+=arg
+                    print(filename)
                     handler.handle_upload(client_socket, filename)
                 else:
                     client_socket.sendall(b'530 Please login with USER and PASS\r\n')
             elif command == 'DELE':
                 if self.authenticated.get(client_socket, False):
-                    filename = args[0]
+                    filename = args[1]
                     handler.handle_del(client_socket, filename)
                 else:
                     client_socket.sendall(b'530 Please login with USER and PASS\r\n')
             elif command == 'CWD':
                 if self.authenticated.get(client_socket, False):
-                    directory = args[0]
+                    directory = args[1] if len(args)>1 else args[0]
                     handler.handle_change_dir(client_socket, directory)
                 else:
                     client_socket.sendall(b'530 Please login with USER and PASS\r\n')
@@ -200,7 +214,7 @@ class FTP_Server():
                     client_socket.sendall(b'530 Please login with USER and PASS\r\n')
             elif command == 'PORT':
                 if self.authenticated.get(client_socket, False):
-                    handler.handle_port(client_socket, args)
+                    handler.handle_port(client_socket, args[0])
                 else:
                     client_socket.sendall(b'530 Please login with USER and PASS\r\n')
             elif command == 'PASV':
@@ -214,12 +228,22 @@ class FTP_Server():
                     client_socket.sendall(response.encode())
                 else:
                     client_socket.sendall(b'504 Command not implemented for that parameter\r\n')
+            elif command == 'SYST':
+                client_socket.sendall(b'215 Windows_NT\r\n')
+            elif command == 'FEAT':
+                features = '211 Features \r\n'
+                for cmd in self.commands:
+                    features += f'{cmd}\r\n'
+                features+= '211 End\r\n'
+                client_socket.sendall(features.encode())
+        
+            
             else:
                 client_socket.sendall(b'500 Command not supported\r\n')
 
 ROOT='ftp_folder'
 DIR= os.path.join(os.getcwd(),ROOT)
-COMMANDS = ['USER', 'PASS', 'QUIT', 'LIST', 'RETR','STOR', 'DELE', 'CWD', 'PWD', 'MKD', 'RMD'] 
+COMMANDS = ['USER', 'PASS', 'QUIT', 'LIST', 'RETR','STOR', 'DELE', 'CWD', 'PWD', 'MKD', 'PORT', 'PASV'] 
 VALID_USERS = {'Kevin':'Kevin','Jan Carlos':'Jan Carlos'}
 
 
