@@ -4,6 +4,7 @@ import json
 import threading
 import random
 import time
+import platform
 
 class FTP_Handler():
     def __init__(self,root) -> None:
@@ -229,7 +230,9 @@ class FTP_Server():
                 else:
                     client_socket.sendall(b'504 Command not implemented for that parameter\r\n')
             elif command == 'SYST':
-                client_socket.sendall(b'215 Windows_NT\r\n')
+                system = platform.system()
+                response = f'215 {system}\r\n'
+                client_socket.sendall(response.encode())
             elif command == 'FEAT':
                 features = '211 Features \r\n'
                 for cmd in self.commands:
