@@ -75,7 +75,7 @@ class ChordNodeReference:
         """Notifies to current node about another node 
 
         Args:
-            node (ChordNodeReference): New or reincorpored node in the ring 
+            node (ChordNodeReference): Joined node in the ring 
         """
         self._send_data(NOTIFY, f'{node.id},{node.ip}')
 

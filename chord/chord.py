@@ -17,6 +17,7 @@ CHECK_PREDECESSOR = 8
 CLOSEST_PRECEDING_FINGER = 9
 NOTIFY_PRED = 10
 
+PORT = 8001
 
 class ChordNode:
     def __init__(self, id: int, ip: str, port: int = 8001, m: int = 160):
@@ -30,15 +31,11 @@ class ChordNode:
         self.m = m  # Number of bits in the hash/key space
         self.finger = [self.ref] * self.m  # Finger table
         self.next = 0  # Finger table index to fix next
+        self._start_threads()
 
-        # threading.Thread(target=self.stabilize, daemon=True).start()  # Start stabilize thread
-        # threading.Thread(target=self.fix_fingers, daemon=True).start()  # Start fix fingers thread
-        # threading.Thread(target=self.check_predecessor, daemon=True).start()  # Start check predecessor thread
-        # threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
 
     def _start_threads(self):
         threading.Thread(target=self.stabilize, daemon=True).start()  # Start stabilize thread
-        threading.Thread(target=self.fix_fingers, daemon=True).start()  # Start fix fingers thread
         threading.Thread(target=self.check_predecessor, daemon=True).start()  # Start check predecessor thread
         threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
 
@@ -222,6 +219,14 @@ class ChordNode:
         node = self.find_succ(key_hash)
         return node.retrieve_key(key)
 
+    def _start_server(self):
+        while True:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.bind('',int(PORT))
+            msg, _ = s.recvfrom(1024)
+            
+            pass
+        pass
     # def data_receive(self, conn: socket, addr, data: list):
     #     data_resp = None
     #     option = int(data[0])
