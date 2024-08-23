@@ -4,7 +4,7 @@ import sys
 import time
 from utils import *
 from chord.chord_node_reference import ChordNodeReference
-
+from election import ElectorNode
 
 FIND_SUCCESSOR = 1
 FIND_PREDECESSOR = 2
@@ -18,19 +18,22 @@ CLOSEST_PRECEDING_FINGER = 9
 NOTIFY_PRED = 10
 
 PORT = 8001
+#falta poner lo de coordinacion en este flujo, antes se testeará lo basico.
+
 
 class ChordNode:
-    def __init__(self, id: int, ip: str, port: int = 8001, m: int = 160):
-        self.id = getShaRepr(str(id))
+    def __init__(self, ip: str, port: int = 8001, m: int = 160):
+        self.id = getShaRepr(str(ip))
         print(self.id)
         self.ip = ip
         self.port = port
         self.ref = ChordNodeReference(self.ip, self.port)
-        self.succ = self.ref  # Initial successor is itself
+        self.succ: ChordNodeReference = self.ref  # Initial successor is itself
         self.pred = None  # Initially no predecessor
         self.m = m  # Number of bits in the hash/key space
         self.finger = [self.ref] * self.m  # Finger table
         self.next = 0  # Finger table index to fix next
+        self.elector = ElectorNode(self.id)
         self._start_threads()
 
 
@@ -118,76 +121,60 @@ class ChordNode:
     
     def stabilize(self):
         """Regular check for correct Chord structure."""
-        
         while True:
-            if self.succ.id != self.id:
+            if self.id != self.succ.id:
                 print('stabilize')
-                if self.succ.check_node() != b'':
-                    x = self.succ.pred
-                    print(x)
-                    if x.id != self.id:
-                        if x and self._inbetween(x.id, self.id, self.succ.id):
-                            self.succ = x
-                        self.succ.notify(self.ref)
-
+                if self.succ.check_node() != b'': #the successor isn't dead
+                    succ_predecessor = self.succ.pred
+                    print(succ_predecessor)
+                    if succ_predecessor.id != self.id:   #it's not itself
+                        if succ_predecessor and self._inbetween(succ_predecessor.id, self.id, self.succ):
+                            self.succ = succ_predecessor
+                        self.succ.notify(self.ref)     
+                              
             print(f"successor : {self.succ} predecessor {self.pred}")
             time.sleep(10)
-        
+
 
     def notify(self, node: 'ChordNodeReference'):
-        """Informs to a node about another node
+        """Rectifies the predecessor cause the new node entry
 
         Args:
-            node (ChordNodeReference): The node
+            node (ChordNodeReference): The new node
         """
         print(f'in notify, my id: {self.id} my pred: {node.id}')
         if node.id == self.id:
             pass
+        elif not self.pred and self.id == self.succ.id:
+            self.pred = node
+            self.succ = node
+            self.succ.notify(self.ref) 
         elif not self.pred:
             self.pred = node
-            if self.id == self.succ.id:
-                self.succ = node
-                self.succ.notify(self.ref)
         elif self._inbetween(node.id, self.pred.id, self.id):
-            self.pred.notify_pred(node)
-            self.pred = node
+            self.pred  = node
+       
+        
 
-    def notify_pred(self, node: 'ChordNodeReference'):
+    def notify_pred(self):
         """Exterior call to stabilize network."""
-        print(f'in notify pred, my id: {self.id} my succ: {node.id}')
-        self.succ = node
+
+        print(f'notify_pred: NOTIFICANDO AL PREDECESOR DE ID ES: {self.id}, ID DEL PREDECESOR: {self.pred.id} QUE SU SUCESOR SOY YO MISMO')
+        self.pred.succ = self.ref
 
     def fix_fingers(self):
-        while True:
-            to_write = ''
-            for i in range(self.m):
-                # Calcular el próximo índice de dedo
-                next_index = (self.id + 2**i) % 2**self.m
-                if self.succ.id == self.id:
-                    self.finger[i] = self.ref
-                else:
-                    if self._inbetween(next_index, self.id, self.succ.id):
-                        self.finger[i] = self.succ
-                    else:
-                        node = self.succ.closest_preceding_finger(next_index)
-                        if node.id != next_index:
-                            node = node.succ
-                        self.finger[i] = node
-                
-                if i == 0 or self.finger[i-1].id != self.finger[i].id or i > 154:
-                    to_write += f'>> ({i}, {next_index}): {self.finger[i].id}\n'
-            print(f'fix_fingers {self.id}: {self.succ} and {self.pred}')
-            print(f'{self.id}:\n{to_write}')
-            time.sleep(10)
+        pass
 
     def check_predecessor(self):
         while True:
             try:
                 if self.pred and self.pred.check_node() == b'':
-                    print("Lost predecessor")
+                    print("check_predecessor: PREDECESOR PERDIDO")
                     self.pred = self.find_pred(self.pred.id)
-                    self.pred.notify_pred(self.ref)
+                    self.notify_pred()
+                    # self.pred.notify_pred(self.ref)
             except Exception as e:
+                print("check_predecessor: ENTRA A LA EXCEPCION")
                 self.pred = None
             time.sleep(10)
 
@@ -224,7 +211,7 @@ class ChordNode:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.bind('',int(PORT))
             msg, _ = s.recvfrom(1024)
-            
+
             pass
         pass
     # def data_receive(self, conn: socket, addr, data: list):
@@ -286,7 +273,7 @@ class ChordNode:
 
 if __name__ == "__main__":
 
-    
+    # esto tiene el id puesto todavia, tengo que arreglarlo.
     print(sys.argv)
     other_node = None
     if len(sys.argv) <= 1:
@@ -295,7 +282,7 @@ if __name__ == "__main__":
     print(id)
     ip = socket.gethostbyname(socket.gethostname())
     print(ip)
-    t = ChordNode(id, ip)
+    t = ChordNode(ip)
     if len(sys.argv) >= 3:
         print('another node')
         other_node = sys.argv[2].split(":")
