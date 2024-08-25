@@ -6,17 +6,14 @@ from utils import *
 from chord.chord_node_reference import ChordNodeReference
 from chord.election import BroadcastElectorNode
 from operations import *
-import logging
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
 
-logger = logging.getLogger(__name__)
+
 
 PORT = 8001
 
 class ChordNode:
-    def __init__(self, ip: str, port: int = 8001, m: int = 160, election: bool = True):
+    def __init__(self, ip: str, port: int = 8001, m: int = 160):
         # el parametro election es solo para que tenga en cuenta todo lo de coordinacion.
         self.ip = ip
         self.id = getShaRepr(str(ip))
@@ -27,7 +24,7 @@ class ChordNode:
         self.m = m  # Number of bits in the hash/key space
         self.finger = [self.ref] * self.m  # Finger table
         self.next = 0  # Finger table index to fix next
-        self.elector = BroadcastElectorNode(self.id)
+        self.elector: BroadcastElectorNode = BroadcastElectorNode(self.id)
         self._start_threads()
 
 
@@ -35,8 +32,16 @@ class ChordNode:
         threading.Thread(target=self.stabilize, daemon=True).start()  # Start stabilize thread
         threading.Thread(target=self.check_predecessor, daemon=True).start()  # Start check pred thread
         threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
+        threading.Thread(target=self._coordinator_checker, daemon=True).start() # Start coordinator checker thread
+        threading.Thread(target=self.elector.process_election, daemon=True).start() # Start process election thread
 
-
+    def _coordinator_checker(self):
+        while True:
+            time.sleep(10)
+            coordinator_node = ChordNodeReference(self.elector.get_coordinator())
+            if not coordinator_node.check_node():
+                print("_coordinator_checker: COORDINATOR LOST")
+                self.elector.coordinator_loss()
 
     def _inbetween(self, k: int, start: int, end: int) -> bool:
         """Checks if k is in the interval (start, end].
@@ -106,6 +111,7 @@ class ChordNode:
             logger.debug("join: EL NODO VIENE ESPECIFICADO!")
             self.pred = None
             self.succ = node.find_successor(self.id)
+            self.elector.adopt_coordinator(node.get_coordinator())
             print(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
             self.succ.notify(self.ref)
             
@@ -192,9 +198,9 @@ class ChordNode:
                 if self.pred and not self.pred.check_node():
 
                     logger.debug("check_predecessor: PREDECESOR PERDIDO\n")
-
                     self.pred = self.find_pred(self.pred.id)
                     self.pred.notify_pred(self.ref)
+
 
             except Exception as e:
                 logger.debug(f"[XXX] check_predecessor: ENTRA A LA EXCEPCION: {e}\n")
@@ -242,6 +248,7 @@ class ChordNode:
                 data = conn.recv(1024).decode().split(',')
 
                 threading.Thread(target=self.data_receive, args=(conn, addr, data)).start()
+                
 
     def data_receive(self, conn: socket, addr, data: list):
         """Decides what it do with the messages
@@ -286,6 +293,9 @@ class ChordNode:
             ip = data[2]
             self.first_notify(ChordNodeReference(ip, self.port))
        
+        elif option == GET_COORDINATOR:
+            coord_ip = self.elector.get_coordinator()
+            data_resp = ChordNodeReference(coord_ip)
 
         # Send response
         if data_resp:

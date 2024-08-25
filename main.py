@@ -3,7 +3,8 @@ from chord.chord_node_reference import ChordNodeReference
 from ipaddress import ip_address
 import socket
 import sys
-
+#172.17.0.2
+#172.17.0.6
 if __name__ == "__main__":
     # Get current IP
     ip = socket.gethostbyname(socket.gethostname())
