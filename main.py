@@ -1,8 +1,31 @@
+from chord.chord import ChordNode
 from chord.chord_node_reference import ChordNodeReference
+from ipaddress import ip_address
+import socket
+import sys
 
-cnr = ChordNodeReference('localhost')
+if __name__ == "__main__":
+    # Get current IP
+    ip = socket.gethostbyname(socket.gethostname())
 
-cnr._send_data("PERRO", "HOLA")
-# para este codigo recibe el mensaje que esta mas abajo, que es la operacion, id
-# cnr.find_successor(3)
-# [RECV] Mensaje recibido de ('127.0.0.1', 55671): 1,3
+    # Create node
+    node = ChordNode(ip)
+    print(f"[IP]: {ip}")
+
+    # Single node case
+    if len(sys.argv) == 1:
+        node.join()
+
+    # Join node case
+    elif len(sys.argv) == 2:
+        try:
+            target_ip = ip_address(sys.argv[1])
+        except:
+            raise Exception(f"Parameter {sys.argv[1]} is not a valid IP address")
+        
+        node.join(ChordNodeReference(sys.argv[1]))
+    else:
+        raise Exception("Incorrect params")
+
+    while True:
+        pass
