@@ -1,16 +1,12 @@
 import socket
 import threading
-import sys
 import time
 from utils import *
 from chord.chord_node_reference import ChordNodeReference
 from chord.election import BroadcastElectorNode
 from operations import *
+from consts import *
 
-
-
-
-PORT = 8001
 
 class ChordNode:
     def __init__(self, ip: str, port: int = 8001, m: int = 160):
@@ -34,6 +30,7 @@ class ChordNode:
         threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
         threading.Thread(target=self._coordinator_checker, daemon=True).start() # Start coordinator checker thread
         threading.Thread(target=self.elector.process_election, daemon=True).start() # Start process election thread
+        threading.Thread(target=self.start_broadcast_server, daemon=True).start()
 
     def _coordinator_checker(self):
         while True:
@@ -235,9 +232,8 @@ class ChordNode:
         node = self.find_succ(key_hash)
         return node.retrieve_key(key)
 
+
     def start_server(self):
-        """Method to process incoming requests.
-        """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((self.ip, self.port))
@@ -248,7 +244,43 @@ class ChordNode:
                 data = conn.recv(1024).decode().split(',')
 
                 threading.Thread(target=self.data_receive, args=(conn, addr, data)).start()
+
+    
+    def start_broadcast_server(self):
+        """Method to process incoming requests.
+        """
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.bind(('',BROADCAST_PORT))
+        print(f"start_broadcast_server: COMIENZA A ESCUCHAR")
+        
+        while True:
+            data, addr = s.recvfrom(1024)
+
+            if addr[0] == self.ip:
+                print("start_broadcast_server: EL MENSAJE ES DE EL MISMO")
+                continue
+            else:
+                print(f"start_broadcast_server: MENSAJE RECIBIDO DESDE: {addr[0]}")
+                data = data.decode().split(',')
+                operation = int(data[0])
                 
+                if operation == DISCOVER:
+                    print("start_broadcast_server: DISCOVER OPERATION")
+                    sender_ip = data[1]
+                    sender_port = int(data[2])
+                    
+                    print(f'start_broadcast_server: {self.ip} MANDA EL MENSAJE HACIA {sender_ip}:{sender_port}')
+                    
+                    response = f'{ENTRY_POINT},{self.ip}'
+
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                        sock.connect((sender_ip, sender_port))
+                        sock.sendall(response.encode('utf-8'))
+                        print(f"start_broadcast_server: MENSAJE {response} ENVIADO CON EXITO HACIA {sender_ip}:{sender_port}")
+                except Exception as e:
+                    print(e)
+
 
     def data_receive(self, conn: socket, addr, data: list):
         """Decides what it do with the messages

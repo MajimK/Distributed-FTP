@@ -2,14 +2,14 @@ import socket
 from utils import getShaRepr
 import logging
 from operations import *
-
+from consts import PORT
 # logger configuration
 #### here ####
 
 # no necesito el id en la referencia del nodo, es identificable perfectamente por el puerto y el ip
 # esto seria lo que es el nodo como tal de Chord, o sea, lo que se encierra en el cuadrado en los esquemas que he hecho
 class ChordNodeReference:
-    def __init__(self, ip: str, port: int = 8001):
+    def __init__(self, ip: str, port: int = PORT):
         self.id = getShaRepr(ip)
         self.ip = ip
         self.port = port

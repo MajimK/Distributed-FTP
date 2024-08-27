@@ -1,12 +1,12 @@
 import socket, threading
 from utils import send_by_broadcast, logger, bully
 import time
-PORT = 8002
+from consts import BROADCAST_PORT
 #--- messages region ---#
 ELECTION = 0
 COORDINATOR = 1
 FEEDBACK = 2
-
+PORT = 8002
 # no necesito el id porque cada nodo tiene un elector nodo que le corresponde y todos tienen la propiedad is_coordinator
 class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo o al menos una referencia a el (NO?) al que corresponde
     def __init__(self, id: int) -> None:
@@ -29,26 +29,26 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
             self.is_coordinator = True
 
     def start_election(self):
-        t = threading.Thread(target=send_by_broadcast,args=(f'{ELECTION}', PORT))
+        t = threading.Thread(target=send_by_broadcast,args=(f'{ELECTION}'))
         t.start()
-        logger.debug(f"start_election: ELECCION COMENZADA POR {self.id}")
+        # logger.debug(f"start_election: ELECCION COMENZADA POR {self.id}")
 
     def end_election(self):
-        t = threading.Thread(target=send_by_broadcast, args=(f'{COORDINATOR}',PORT))
+        t = threading.Thread(target=send_by_broadcast, args=(f'{COORDINATOR}'))
         t.start()
-        logger.debug("end_election: ELECCION TERMINADA")
+        # logger.debug("end_election: ELECCION TERMINADA")
 
     def process_election(self):
         t = threading.Thread(target=self.start_election_server)
         t.start()
 
-        logger.debug("ENTRA AL PROCESS_ELECTION")
+        # logger.debug("ENTRA AL PROCESS_ELECTION")
         counter = 0
         while True:
             if not self.coordinator and not self.is_in_election:
                 self.is_in_election = True
                 self.start_election()
-                logger.debug(f"elect: {self.id} HA LLAMADO A ELECCIONES")
+                # logger.debug(f"elect: {self.id} HA LLAMADO A ELECCIONES")
 
             elif self.is_in_election:
                 counter+=1
@@ -57,11 +57,12 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                         self.coordinator = self.ip
                         self.is_in_election =False
                         self.end_election()
-                        logger.debug(f"elect: {self.id} DA POR CONCLUIDAS LAS ELECCIONES")
+                        # logger.debug(f"elect: {self.id} DA POR CONCLUIDAS LAS ELECCIONES")
                     counter = 0
                     self.is_in_election = False
             else: 
-                logger.debug(f'elect: EL COORDINADOR ES: {self.coordinator}')
+                pass
+                # logger.debug(f'elect: EL COORDINADOR ES: {self.coordinator}')
             
             time.sleep(1)
 
@@ -81,7 +82,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                     operation = int(msg)
 
                     if operation == ELECTION and not self.is_in_election:
-                        logger.debug(f"start_server_election: ELECTION MESSAGE SENT BY {self.ip}")
+                        # logger.debug(f"start_server_election: ELECTION MESSAGE SENT BY {self.ip}")
                         self.is_in_election = True
                         self.start_election()
 
@@ -91,20 +92,21 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                             socket_sender.sendto(f'{FEEDBACK}', (ip,PORT))
 
                     elif operation == FEEDBACK:
-                        logger.debug(f"start_server_election: FEEDBACK MESSAGE SENT BY {self.ip}")
+                        # logger.debug(f"start_server_election: FEEDBACK MESSAGE SENT BY {self.ip}")
                         if self.coordinator and bully(ip, self.coordinator):
                             self.coordinator = ip
                         self.is_coordinator = False
                         
                     elif operation == COORDINATOR:
-                        logger.debug(f"start_server_election: COORDINATOR MESSAGE SENT BY {self.ip}")
+                        # logger.debug(f"start_server_election: COORDINATOR MESSAGE SENT BY {self.ip}")
                         if not bully(self.ip, ip) and (not self.coordinator or bully(ip, self.coordinator)):
                             self.coordinator = ip
                             self.is_in_election = False
                             self.is_coordinator = False if self.ip == ip else True 
 
             except Exception as e:
-                logger.debug(f"start_election_server: ENTRO A LA EXCEPCION {e}")
+                pass
+                # logger.debug(f"start_election_server: ENTRO A LA EXCEPCION {e}")
 
 
 
