@@ -18,7 +18,6 @@ if __name__ == "__main__":
 
     # Join node case
     elif len(sys.argv) == 2 and sys.argv[1] == '-s':
-        print("PENETRA AQUI")
         target_ip = SelfDiscovery(ip).find()
         print("SELF_D AQUI")
         node = ChordNode(ip)

@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 def getShaRepr(data: str):
     return int(hashlib.sha1(data.encode()).hexdigest(),16)
 
-def send_by_broadcast(message: str,closed=True):
+def send_by_broadcast(message: str,closed=True, broadcast_port = BROADCAST_PORT):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    s.sendto(message.encode(), ('<broadcast>', BROADCAST_PORT))
+    s.sendto(message.encode(), ('<broadcast>', broadcast_port))
     if closed:
         s.close()
     

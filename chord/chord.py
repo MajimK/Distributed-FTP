@@ -274,7 +274,7 @@ class ChordNode:
                     response = f'{ENTRY_POINT},{self.ip}'
 
                 try:
-                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                         sock.connect((sender_ip, sender_port))
                         sock.sendall(response.encode('utf-8'))
                         print(f"start_broadcast_server: MENSAJE {response} ENVIADO CON EXITO HACIA {sender_ip}:{sender_port}")

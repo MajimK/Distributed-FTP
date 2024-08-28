@@ -6,7 +6,7 @@ from operations import DISCOVER, ENTRY_POINT
 import time
 
 class SelfDiscovery:
-    def __init__(self, ip: str, port: int = PORT) -> None:
+    def __init__(self, ip: str, port: int = PORT):
         self.ip = ip
         self.port = port
 

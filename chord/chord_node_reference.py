@@ -80,8 +80,10 @@ class ChordNodeReference:
         return ChordNodeReference(ip, self.port)
 
     def get_coordinator(self) -> str:
-        coordinator = self._send_data(GET_COORDINATOR).decode().split(',')[1]
-        return coordinator
+        coordinator = self._send_data(GET_COORDINATOR).decode().split(',')
+        print("get_coordinator: COORDINATOR ES: ", coordinator)
+        coord_ip = coordinator[1]
+        return coord_ip
     
     def notify(self, node: 'ChordNodeReference'):
         """Notifies to current node about another node 
