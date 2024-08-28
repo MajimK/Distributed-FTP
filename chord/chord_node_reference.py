@@ -2,20 +2,20 @@ import socket
 from utils import getShaRepr
 import logging
 from operations import *
-
+from consts import PORT
 # logger configuration
 #### here ####
 
 # no necesito el id en la referencia del nodo, es identificable perfectamente por el puerto y el ip
 # esto seria lo que es el nodo como tal de Chord, o sea, lo que se encierra en el cuadrado en los esquemas que he hecho
 class ChordNodeReference:
-    def __init__(self, ip: str, port: int = 8001):
-        self.id = id
+    def __init__(self, ip: str, port: int = PORT):
+        self.id = getShaRepr(ip)
         self.ip = ip
         self.port = port
 
 
-    def _send_data(self, op:int, data:str):
+    def _send_data(self, op: int, data: str = None):
         """Internal function to send data to referenced node (self)
 
         Args:
@@ -30,8 +30,11 @@ class ChordNodeReference:
                 print(f'sending {op}')
                 s.connect((self.ip, self.port))
                 s.sendall(f'{op},{data}'.encode('utf-8'))
-                # print(s.recv(1024)) entra en bucle cuando pongo esto porque en la siguiente linea busca una respuesta del socket
-                return s.recv(1024)
+                if op == CHECK_NODE:
+                    response = s.recv(1024)
+                    print(f"SEND_DATA: RESPONSE EN CHECK_NODE ES: {response}")
+                    return response
+                else: return s.recv(1024)
         except Exception as e:
             print(f"Error sending data: {e}")
             return b''
@@ -47,7 +50,8 @@ class ChordNodeReference:
             ChordNodeReference: Successor reference
         """
         response = self._send_data(FIND_SUCCESSOR, str(id)).decode().split(',')
-        return ChordNodeReference(int(response[1]), self.port)
+        ip = response[1]
+        return ChordNodeReference(ip, self.port)
 
     def find_predecessor(self, id: int) -> 'ChordNodeReference':
         """Gets Chord node reference of the given node predecessor 
@@ -59,18 +63,28 @@ class ChordNodeReference:
             ChordNodeReference: Predecessor reference
         """
         response = self._send_data(FIND_PREDECESSOR, str(id)).decode().split(',')
-        return ChordNodeReference(int(response[1]), self.port)
+        ip =response[1]
+        return ChordNodeReference(ip, self.port)
 
     @property
-    def successor(self) -> 'ChordNodeReference':
+    def succ(self) -> 'ChordNodeReference':
         response = self._send_data(GET_SUCCESSOR).decode().split(',')
-        return ChordNodeReference(int(response[1]), self.port)
+        ip =response[1]
+        return ChordNodeReference(ip, self.port)
 
     @property
-    def predecessor(self) -> 'ChordNodeReference':
+    def pred(self) -> 'ChordNodeReference':
         response = self._send_data(GET_PREDECESSOR).decode().split(',')
-        return ChordNodeReference(int(response[1]), self.port)
+        print(f'!!!!!!RESPONSE: {response}')
+        ip =response[1]
+        return ChordNodeReference(ip, self.port)
 
+    def get_coordinator(self) -> str:
+        coordinator = self._send_data(GET_COORDINATOR).decode().split(',')
+        print("get_coordinator: COORDINATOR ES: ", coordinator)
+        coord_ip = coordinator[1]
+        return coord_ip
+    
     def notify(self, node: 'ChordNodeReference'):
         """Notifies to current node about another node 
 
@@ -87,10 +101,16 @@ class ChordNodeReference:
         """
         self._send_data(NOTIFY_PRED, f'{node.id},{node.ip}')
 
+    def first_notify(self, node: 'ChordNodeReference'):
+        self._send_data(FIRST_NOTIFY, f'{node.id},{node.ip}')
+
     def check_node(self):
         """Checks if the predecessor is alive
         """
-        self._send_data(CHECK_NODE)
+        response = self._send_data(CHECK_NODE)
+        if response != b'' and len(response.decode()) > 0:
+            return True
+        return False
 
     def closest_preceding_finger(self, id: int) -> 'ChordNodeReference':
         """Returns the closest node in the finger table of the given node
@@ -102,7 +122,8 @@ class ChordNodeReference:
             ChordNodeReference: The closest preceding node in finger table
         """
         response = self._send_data(CLOSEST_PRECEDING_FINGER, str(id)).decode().split(',')
-        return ChordNodeReference(int(response[1]), self.port)
+        ip =response[1]
+        return ChordNodeReference(ip, self.port)
     
     ### FALTA RETRIEVE KEY & STORE KEY
 
