@@ -2,8 +2,8 @@ import socket
 import threading
 import time
 from utils import *
-from chord.chord_node_reference import ChordNodeReference
-from chord.election import BroadcastElectorNode
+from communication.chord_node_reference import ChordNodeReference
+from dht.election import BroadcastElectorNode
 from operations import *
 from consts import *
 
