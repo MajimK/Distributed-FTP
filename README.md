@@ -1,2 +1,2 @@
 # Distributed-FTP
-Final Distributed Systems Project. Read the report in docs folder.
+Distributed Systems Final Project. Read the report in docs folder.
