@@ -1,8 +1,8 @@
-from chord.chord import ChordNode
-from chord.chord_node_reference import ChordNodeReference
+from dht.chord import ChordNode
+from communication.chord_node_reference import ChordNodeReference
 import socket
 import sys
-from self_discovery import SelfDiscovery
+from communication.self_discovery import SelfDiscovery
 
 if __name__ == "__main__":
     # Get current IP
