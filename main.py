@@ -3,6 +3,7 @@ from communication.chord_node_reference import ChordNodeReference
 import socket
 import sys
 from communication.self_discovery import SelfDiscovery
+from application.FTPNode import FTPNode
 
 if __name__ == "__main__":
     # Get current IP
@@ -10,7 +11,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 1:
         # Create node
-        node = ChordNode(ip)
+        node = FTPNode(ip)
         print(f"[IP]: {ip}")
 
         # Single node case
@@ -20,7 +21,7 @@ if __name__ == "__main__":
     elif len(sys.argv) == 2 and sys.argv[1] == '-s':
         target_ip = SelfDiscovery(ip).find()
         print("SELF_D AQUI")
-        node = ChordNode(ip)
+        node = FTPNode(ip)
         print("CN AQUI")
         node.join(ChordNodeReference(target_ip))
         print("JOIN AQUI")

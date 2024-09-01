@@ -1,3 +1,4 @@
+#---------BASIC CHORD---------#
 FIND_SUCCESSOR = 1
 FIND_PREDECESSOR = 2
 GET_SUCCESSOR = 3
@@ -11,5 +12,27 @@ JOIN = 11
 NOTIFY_PRED = 12
 FIRST_NOTIFY = 13
 GET_COORDINATOR=14
+#---------BASIC CHORD---------#
+
+
+
+#---------SELF DISCOVERY---------#
 DISCOVER = 15
 ENTRY_POINT = 16
+#---------SELF DISCOVERY---------#
+
+
+
+#---------FTP---------#
+STORE_DIRECTORY=19
+ADD_FILE = 20
+DELETE_DIRECTORY = 22
+#---------FTP---------#
+
+
+
+#---------REPLICATION---------#
+REPLICATE_STORE_DIRECTORY = 17
+REPLICATE_ADD_FILE = 18
+REPLICATE_DELETE_DIRECTORY = 21
+#---------REPLICATION---------#

@@ -6,7 +6,7 @@ from communication.chord_node_reference import ChordNodeReference
 from dht.election import BroadcastElectorNode
 from operations import *
 from consts import *
-
+from data_access.DataNode import DataNode
 
 class ChordNode:
     def __init__(self, ip: str, port: int = 8001, m: int = 160):
