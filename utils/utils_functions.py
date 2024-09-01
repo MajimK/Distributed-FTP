@@ -1,7 +1,7 @@
 import hashlib
 import socket
 import logging
-from consts import *
+from utils.consts import *
 from typing import Dict, List
 OK = 1
 
@@ -44,20 +44,4 @@ def bully(ip1, ip2):
     return int(ip1.split('.')[-1]) > int(ip2.split('.')[-1])
 
 
-class FileSystemEntity:
-    def __init__(self, name: str, path: str, size: float = 0.0) -> None:
-        self.name = name
-        self.path = path
-        self.size = size
 
-class File(FileSystemEntity):  
-    def __init__(self, name, path, size) -> None:
-        super().__init__(name, path, size)
-        self.extension = None
-        pass
-
-        
-class Directory(FileSystemEntity):
-    def __init__(self, name, path, size) -> None:
-        super().__init__(name, path, size)
-        self.files: List[FileSystemEntity] = []

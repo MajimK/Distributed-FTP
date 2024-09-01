@@ -1,11 +1,11 @@
 import socket
 import threading
 import time
-from utils import *
+from utils.utils_functions import *
 from communication.chord_node_reference import ChordNodeReference
 from dht.election import BroadcastElectorNode
-from operations import *
-from consts import *
+from utils.operations import *
+from utils.consts import *
 from data_access.DataNode import DataNode
 
 class ChordNode:

@@ -24,9 +24,9 @@ ENTRY_POINT = 16
 
 
 #---------FTP---------#
-STORE_DIRECTORY=19
+STOR=19
 ADD_FILE = 20
-DELETE_DIRECTORY = 22
+DELE = 22
 #---------FTP---------#
 
 

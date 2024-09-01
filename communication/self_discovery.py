@@ -1,8 +1,8 @@
-from consts import *
+from utils.consts import *
 import threading
 import socket
-from utils import send_by_broadcast
-from operations import DISCOVER, ENTRY_POINT
+from utils.utils_functions import send_by_broadcast
+from utils.operations import DISCOVER, ENTRY_POINT
 import time
 
 class SelfDiscovery:

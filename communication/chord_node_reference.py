@@ -1,8 +1,8 @@
 import socket
-from utils import getShaRepr
+from utils.utils_functions import getShaRepr
 import logging
-from operations import *
-from consts import PORT, FTP_PORT
+from utils.operations import *
+from utils.consts import PORT, FTP_PORT
 # logger configuration
 #### here ####
 
@@ -135,11 +135,11 @@ class ChordNodeReference:
 
     ###------- DATA ACCESS -------###
     def store_directory(self,directory:str):
-        response = self._send_data(STORE_DIRECTORY,directory,True).decode()
+        response = self._send_data(STOR,directory,True).decode()
         return response
     
     def delete_directory(self, directory: str):
-        response = self._send_data(DELETE_DIRECTORY, directory, True).decode()
+        response = self._send_data(DELE, directory, True).decode()
         return response
 
     def add_file(self, directory_name:str, file_name:str):

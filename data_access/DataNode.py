@@ -1,7 +1,7 @@
-from utils import *
-from consts import DATABASE_PORT
+from utils.utils_functions import *
+from utils.consts import DATABASE_PORT
 from typing import Dict, List
-from operations import *
+from utils.operations import *
 import threading
 import socket
 import time

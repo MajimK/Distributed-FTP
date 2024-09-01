@@ -1,7 +1,7 @@
 import socket, threading
-from utils import send_by_broadcast, logger, bully
+from utils.utils_functions import send_by_broadcast, logger, bully
 import time
-from consts import BROADCAST_PORT
+from utils.consts import BROADCAST_PORT
 #--- messages region ---#
 ELECTION = 0
 COORDINATOR = 1

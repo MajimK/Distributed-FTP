@@ -1,10 +1,10 @@
 from dht.chord import ChordNode
 from data_access.DataNode import DataNode
-from consts import *
+from utils.consts import *
 import threading
 from socket import socket
-from operations import *
-from utils import *
+from utils.operations import *
+from utils.utils_functions import *
 import time
 
 class FTPNode(ChordNode):
@@ -18,7 +18,7 @@ class FTPNode(ChordNode):
         threading.Thread(target=self.start_ftp_server, daemon=True).start()
         threading.Thread(target=self._test, daemon=True).start()
 
-    def _handle_insert_directory(self, data: list):
+    def _handle_store_item(self, data: list):
         direc_name = data[0]
         direc_name_hash = getShaRepr(direc_name)
         print(f'handle_insert_directory: NOMBRE HASH: {direc_name_hash}')
@@ -91,10 +91,10 @@ class FTPNode(ChordNode):
         
         operation = int(data[0])
         print(f"receive_ftp_data: LA OPERACION ES {operation}")
-        if operation == STORE_DIRECTORY:
+        if operation == STOR:
             response = self._handle_insert_directory(data[1:])
 
-        elif operation == DELETE_DIRECTORY:
+        elif operation == DELE:
             response = self._handle_delete_directory(data[1:])
         
         elif operation == ADD_FILE:
