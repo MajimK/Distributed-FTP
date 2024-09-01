@@ -25,19 +25,19 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
     
     def adopt_coordinator(self, coordinator: str):
         self.coordinator = coordinator
-        print(f"adopt_coordinator: ADOPTA AL COORDINADOR {self.coordinator}")
+        # print(f"adopt_coordinator: ADOPTA AL COORDINADOR {self.coordinator}")
         if coordinator == self.ip:
             self.is_coordinator = True
 
     def start_election(self):
         t = threading.Thread(target=send_by_broadcast,args=(f'{ELECTION}',True, PORT))
         t.start()
-        logger.debug(f"start_election: ELECCION COMENZADA POR {self.id}")
+        # logger.debug(f"start_election: ELECCION COMENZADA POR {self.id}")
 
     def end_election(self):
         t = threading.Thread(target=send_by_broadcast, args=(f'{COORDINATOR}',True, PORT))
         t.start()
-        logger.debug("end_election: ELECCION TERMINADA")
+        # logger.debug("end_election: ELECCION TERMINADA")
 
     def process_election(self):
         time.sleep(0.5)
@@ -51,7 +51,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
             if not self.coordinator and not self.is_in_election:
                 self.is_in_election = True
                 self.start_election()
-                logger.debug(f"elect: {self.id} HA LLAMADO A ELECCIONES")
+                # logger.debug(f"elect: {self.id} HA LLAMADO A ELECCIONES")
 
             elif self.is_in_election:
                 counter+=1
@@ -60,12 +60,12 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                         self.coordinator = self.ip
                         self.is_in_election =False
                         self.end_election()
-                        logger.debug(f"elect: {self.id} DA POR CONCLUIDAS LAS ELECCIONES")
+                        # logger.debug(f"elect: {self.id} DA POR CONCLUIDAS LAS ELECCIONES")
                     counter = 0
                     self.is_in_election = False
             else: 
                 pass
-                logger.debug(f'elect: EL COORDINADOR ES: {self.coordinator}')
+                # logger.debug(f'elect: EL COORDINADOR ES: {self.coordinator}')
             
             time.sleep(0.5)
 
@@ -89,7 +89,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                     operation = int(msg)
 
                     if operation == ELECTION and not self.is_in_election:
-                        logger.debug(f"start_server_election: MENSAJE ELECCION ENVIADO POR {ip} Y RECIBIDO POR {self.ip}")
+                        # logger.debug(f"start_server_election: MENSAJE ELECCION ENVIADO POR {ip} Y RECIBIDO POR {self.ip}")
                         self.is_in_election = True
 
                         if bully(self.ip, ip):
@@ -99,13 +99,13 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                         self.start_election()
 
                     elif operation == FEEDBACK:
-                        logger.debug(f"start_server_election: MENSAJE FEEDBACK ENVIADO POR {ip} Y RECIBIDO POR {self.ip}")
+                        # logger.debug(f"start_server_election: MENSAJE FEEDBACK ENVIADO POR {ip} Y RECIBIDO POR {self.ip}")
                         if self.coordinator and bully(ip, self.coordinator):
                             self.coordinator = ip
                         self.is_coordinator = False
                         
                     elif operation == COORDINATOR:
-                        logger.debug(f"start_server_election: MENSAJE COORDINATOR ENVIADO POR {ip} Y RECIBIDO POR {self.ip}")
+                        # logger.debug(f"start_server_election: MENSAJE COORDINATOR ENVIADO POR {ip} Y RECIBIDO POR {self.ip}")
                         if not bully(self.ip, ip) and (not self.coordinator or bully(ip, self.coordinator)):
                             self.coordinator = ip
                             self.is_in_election = False
@@ -113,7 +113,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
 
             except Exception as e:
                 pass
-                logger.debug(f"start_election_server: ENTRO A LA EXCEPCION {e}")
+                # logger.debug(f"start_election_server: ENTRO A LA EXCEPCION {e}")
 
 
 

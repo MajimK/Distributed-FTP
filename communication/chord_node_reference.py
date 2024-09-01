@@ -2,20 +2,20 @@ import socket
 from utils import getShaRepr
 import logging
 from operations import *
-from consts import PORT
+from consts import PORT, FTP_PORT
 # logger configuration
 #### here ####
 
 # no necesito el id en la referencia del nodo, es identificable perfectamente por el puerto y el ip
 # esto seria lo que es el nodo como tal de Chord, o sea, lo que se encierra en el cuadrado en los esquemas que he hecho
 class ChordNodeReference:
-    def __init__(self, ip: str, port: int = PORT):
+    def __init__(self, ip: str, port: int = PORT, db_port: int = FTP_PORT ):
         self.id = getShaRepr(ip)
         self.ip = ip
         self.port = port
 
 
-    def _send_data(self, op: int, data: str = None):
+    def _send_data(self, op: int, data: str = None, is_db_port = False):
         """Internal function to send data to referenced node (self)
 
         Args:
@@ -25,16 +25,13 @@ class ChordNodeReference:
         Returns:
             bytes: Answer code 
         """
+        port = self.port if not is_db_port else FTP_PORT
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 print(f'sending {op}')
-                s.connect((self.ip, self.port))
+                s.connect((self.ip, port))
                 s.sendall(f'{op},{data}'.encode('utf-8'))
-                if op == CHECK_NODE:
-                    response = s.recv(1024)
-                    print(f"SEND_DATA: RESPONSE EN CHECK_NODE ES: {response}")
-                    return response
-                else: return s.recv(1024)
+                return s.recv(1024)
         except Exception as e:
             print(f"Error sending data: {e}")
             return b''
@@ -133,4 +130,19 @@ class ChordNodeReference:
     def __repr__(self) -> str:
         return str(self)
     
+
+
+
+    ###------- DATA ACCESS -------###
+    def store_directory(self,directory:str):
+        response = self._send_data(STORE_DIRECTORY,directory,True).decode()
+        return response
+    
+    def delete_directory(self, directory: str):
+        response = self._send_data(DELETE_DIRECTORY, directory, True).decode()
+        return response
+
+    def add_file(self, directory_name:str, file_name:str):
+        response = self._send_data(ADD_FILE,f'{directory_name},{file_name}',True).decode()
+        return response
 
