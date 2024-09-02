@@ -43,16 +43,16 @@ class DataNode:
 
     def make_directories(self, route: str, is_replicate = False):
         route = route.split('/')[2:]
-        path = 'app'
+        current_path = 'app'
         prev_directory = 'app'
         while route:
             directory = route.pop(0)
-            path += '/' + directory
+            current_path += '/' + directory
             if not is_replicate:
-                if directory not in self.files:
-                    self.files[directory] = FileData(path,0,container=prev_directory)
+                if current_path not in self.files:
+                    self.files[current_path] = FileData(directory,current_path,0,container=prev_directory)
             else:
-                self.replicated_files[directory] = FileData(path, container=prev_directory)
+                self.replicated_files[current_path] = FileData(directory, current_path, container=prev_directory)
             prev_directory = directory
         
 

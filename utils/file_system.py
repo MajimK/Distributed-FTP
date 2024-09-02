@@ -23,14 +23,15 @@ class Directory(FileSystemEntity):
 
 
 class FileData():
-    def __init__(self, path, size = 0, container = None) -> None:
+    def __init__(self, name, path, size = 0, container = None) -> None:
         self.path = path
         self.size = size
         self.container = container
+        self.name = name
         pass
 
     def __repr__(self) -> str:
-        return self.path
+        return f'{self.name}: {self.path}'
     
     def __str__(self) -> str:
-        return self.path
+        return f'{self.name}: {self.path}'
