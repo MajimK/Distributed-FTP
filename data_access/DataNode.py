@@ -32,8 +32,9 @@ class DataNode:
         try:
             self.make_directories(directory_name)
             client_socket.sendall(f'220'.encode())
-            operation = f'{REPLICATE_MKD}'
-            send_w_ack(operation, directory_name, successor_ip, self.db_port)
+            if successor_ip != self.ip:
+                operation = f'{REPLICATE_MKD}'
+                send_w_ack(operation, directory_name, successor_ip, self.db_port)
         except Exception as e:
             print(f"handle_mkd_command: {e}")
             client_socket.send(f"403 Already exists".encode())
@@ -94,12 +95,12 @@ class DataNode:
             operation = msg[0]
 
         if operation == MKD:
-            conn.sendall(f"{OK}".encode())
+            # conn.sendall(f"{OK}".encode())
             # directory_name = conn.recv(1024).decode()
             route = msg[1]
             successor_ip = msg[2]
             self.handle_mkd_command(route, successor_ip, conn)
-            conn.sendall(f'{OK}'.encode())
+            # conn.sendall(f'{OK}'.encode())
 
         elif operation == REPLICATE_MKD:
             conn.sendall(f'{OK}'.encode())
