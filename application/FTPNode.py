@@ -6,9 +6,11 @@ from socket import socket
 from utils.operations import *
 from utils.utils_functions import *
 import time
+import os
+from communication.chord_node_reference import ChordNodeReference
 
 class FTPNode(ChordNode):
-    def __init__(self, ip: str, port: int = PORT, ftp_port = FTP_PORT, m: int = 160):
+    def __init__(self, ip: str, port: int = DEFAULT_PORT, ftp_port = FTP_PORT, m: int = 160):
         super().__init__(ip, port, m)
         
         self.ftp_port: int = ftp_port
@@ -18,59 +20,54 @@ class FTPNode(ChordNode):
         threading.Thread(target=self.start_ftp_server, daemon=True).start()
         threading.Thread(target=self._test, daemon=True).start()
 
-    def _handle_store_item(self, data: list):
-        direc_name = data[0]
-        direc_name_hash = getShaRepr(direc_name)
-        print(f'handle_insert_directory: NOMBRE HASH: {direc_name_hash}')
-        owner = self.find_succ(direc_name_hash)
-        if owner.id == self.id:
-            if self.data_node.owns_directory(direc_name):
-                print("ERROR,Key already exists")
-                return "ERROR,Key already exists"
-            else:
-                self.data_node.store_directory(direc_name, self.succ.ip)
-                print("OK,Data inserted")
-                return "OK,Data inserted"
-        else:
-            response = owner.store_directory(direc_name)
-            return response
+    def _handle_cwd_command(self):
+        pass
     
-    def _handle_delete_directory(self, data: list):
-        direc_name = data[0]
-        direc_name_hash = getShaRepr(direc_name)
-        print(f'handle_delete_directory: NOMBRE HASH: {direc_name_hash}')
-        owner = self.find_succ(direc_name_hash)
-        if owner.id == self.id:
-            if self.data_node.owns_directory(direc_name):
-                self.data_node.delete_directory(direc_name, self.succ.ip)
-                print("OK,Data deleted")
-                return "OK,Data deleted"
-            else:
-                print("ERROR,Key doesn't exist")
-                return "ERROR,Key doesn't exist"
+    def _handle_dele_command(self, data: list):
+        pass
+       
+    def _handle_list_command(self):
+        pass
+    
+    def _handle_mkd_command(self, dirrectory_name, client_socket: socket.socket, current_dir):
+        new_path = os.path.normpath(os.path.join(current_dir, dirrectory_name))
+        owner:ChordNodeReference = self.find_successor(dirrectory_name)
+        successor = owner.succ  # to replicating data
+        socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        socket.connect((owner.ip, DATABASE_PORT))
+        socket.sendall(f'{MKD},{new_path},{successor.ip}'.encode())
+        response = socket.recv(1024).decode().strip()
+
+        if response.startswith('220'):
+            socket.close()
+            if client_socket:
+                client_socket.send(f'257 "{new_path}" created.\r\n'.encode())
+
         else:
-            response = owner.delete_directory(direc_name)
-            return response
+            if client_socket:
+                client_socket.send(b"550 Directory already exists.\r\n")
 
-    def _handle_add_file(self, data: list):
-        direc_name = data[0]
-        file_name = data[1]
-        direc_name_hash = getShaRepr(direc_name)
-        print(f'handle_add_file: NOMBRE HASH: {direc_name_hash}')
 
-        owner = self.find_succ(direc_name_hash)
-        if owner.id == self.id:
-            if self.data_node.owns_directory(direc_name):
-                self.data_node.add_file(directory=direc_name,file_name=file_name,successor_ip=self.succ.ip)
-                print("_handle_add_file: OK, ARCHIVO AGREGADO")
-                return "OK,File added"
-            else:
-                print("_handle_add_file: ERROR, EL DIRECTORIO NO EXISTE")
-                "ERROR,Directory name doesn't exist"
-        else:
-            response = owner.add_file(direc_name, file_name)
-            return response
+    def _handle_pasv_command(self):
+        pass
 
+    def _handle_port_command(self):
+        pass
+
+    def _handle_pwd_command(self):
+        pass
+
+    def _handle_retr_command(self):
+        pass
+
+    def _handle_rmd_command(self):
+        pass
+
+    def _handle_stor_command(self, data: list, client_socket: socket.socket):
+        pass
+    
+    def _handle_quit_command(self):
+        pass
 
     def start_ftp_server(self):
         print("start_ftp_server: ENTRA")
@@ -84,21 +81,51 @@ class FTPNode(ChordNode):
                 conn, addr = s.accept()
                 data = conn.recv(1024).decode().split(',')
                 print(f"start_ftp_server: DATA ES {data}")
-                threading.Thread(target=self.receive_ftp_data, args=(conn, addr, data)).start()
+                threading.Thread(target=self.receive_ftp_data, args=(conn, data)).start()
 
 
-    def receive_ftp_data(self, conn: socket, addr,  data: list):
-        
+    def receive_ftp_data(self, conn: socket, data: list):
+        current_dir = os.path.normpath('/app/database')
         operation = int(data[0])
         print(f"receive_ftp_data: LA OPERACION ES {operation}")
-        if operation == STOR:
-            response = self._handle_insert_directory(data[1:])
+        if operation == CWD:
+            response = self._handle_stor_command(data[1:])  # route (implies mkd) or file
 
         elif operation == DELE:
-            response = self._handle_delete_directory(data[1:])
+            response = self._handle_dele_command(data[1:])
         
-        elif operation == ADD_FILE:
-            response = self._handle_add_file(data[1:])
+        elif operation == LIST:
+            response = self._handle_list_command(data[1:])
+
+        elif operation == MKD:
+            response = self._handle_mkd_command(data[1], conn, current_dir)
+
+        elif operation == PASV:
+            response = self._handle_pasv_command()
+
+        elif operation == PORT:
+            response = self._handle_port_command()
+
+        elif operation == PWD:
+            response = self._handle_pwd_command()
+
+        elif operation == RETR:
+            response = self._handle_retr_command()
+
+        elif operation == RMD:
+            response = self._handle_rmd_command()
+
+        elif operation == STOR:
+            response = self._handle_stor_command()
+        
+        elif operation == SYST:
+            conn.send(f'215 UNIX Type: L8\r\n'.encode())
+
+
+        elif operation == QUIT:
+            response = self._handle_quit_command()
+
+
 
 
 

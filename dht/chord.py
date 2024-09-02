@@ -9,7 +9,7 @@ from utils.consts import *
 from data_access.DataNode import DataNode
 
 class ChordNode:
-    def __init__(self, ip: str, port: int = 8001, m: int = 160):
+    def __init__(self, ip: str, port: int = DEFAULT_PORT, m: int = 160):
         # el parametro election es solo para que tenga en cuenta todo lo de coordinacion.
         self.ip = ip
         self.id = getShaRepr(str(ip))

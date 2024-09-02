@@ -142,7 +142,7 @@ class ChordNodeReference:
         response = self._send_data(DELE, directory, True).decode()
         return response
 
-    def add_file(self, directory_name:str, file_name:str):
-        response = self._send_data(ADD_FILE,f'{directory_name},{file_name}',True).decode()
-        return response
+    # def add_file(self, directory_name:str, file_name:str):
+    #     response = self._send_data(ADD_FILE,f'{directory_name},{file_name}',True).decode()
+    #     return response
 

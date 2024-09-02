@@ -5,10 +5,15 @@ from utils.operations import *
 import threading
 import socket
 import time
+from utils.file_system import *
+import os
 class DataNode:
     def __init__(self, ip: str, db_port: int = DATABASE_PORT) -> None:
         self.ip = ip
         self.db_port: int = db_port
+
+        self.file_system_entities = []
+        self.replicated_file_system_entities = []
 
         self.directories: Dict[str, List[str]] = {}
         self.replicated_directories: Dict[str, List[str]] = {}
@@ -17,29 +22,40 @@ class DataNode:
         threading.Thread(target=self._prints, daemon=True).start()
 
 
-    ####-----------DIRECTORIES-----------####
 
     def owns_directory(self, directory_name: str):
         return directory_name in self.directories
 
-    def store_directory(self, directory: str, successor_ip: str):
-        self.directories[directory] = []
-        operation = f'{REPLICATE_STORE_DIRECTORY}'
-        print(f"store_directory: REPLICAR STORE_DIRECTORY HACIA: {successor_ip} ")
-        send_w_ack(operation, directory, successor_ip, self.db_port)
 
-    def delete_directory(self, directory_name: str, successor_ip: str):
-        deleted_direc = self.directories.pop(directory_name)
-        operation = f'{REPLICATE_DELETE_DIRECTORY}'
-        send_w_ack(operation, directory_name, successor_ip, self.db_port)
+    def handle_mkd_command(self, directory_name: str, successor_ip: str, client_socket: socket.socket):
+        if not self.owns_directory(directory_name):
+            self.directories[directory_name] = []
+
+            try:
+                client_socket.sendall(f'220'.encode())
+                operation = f'{REPLICATE_MKD}'
+                send_w_ack(operation, directory_name, successor_ip, self.db_port)
+            except Exception as e:
+                print(f"handle_mkd_command: {e}")
+
+        else:
+            client_socket.send(f"403 Already exists".encode())
+
+
+    def make_directory(self, directory_name):
+        pass
+    # def delete_directory(self, directory_name: str, successor_ip: str):
+    #     deleted_direc = self.directories.pop(directory_name)
+    #     operation = f'{REPLICATE_DELETE_DIRECTORY}'
+    #     send_w_ack(operation, directory_name, successor_ip, self.db_port)
 
     
-    def add_file(self, directory: str, file_name:str, successor_ip):
-        print(f"add_file: EL DIRECTORIO ES {directory} Y EL FILE ES {file_name}")
-        self.directories[directory].append(file_name)
-        operation = f'{REPLICATE_ADD_FILE}'
-        msg = f'{directory},{file_name}'
-        send_w_ack(operation, msg, successor_ip, self.db_port)
+    # def add_file(self, directory: str, file_name:str, successor_ip):
+    #     print(f"add_file: EL DIRECTORIO ES {directory} Y EL FILE ES {file_name}")
+    #     self.directories[directory].append(file_name)
+    #     operation = f'{REPLICATE_ADD_FILE}'
+    #     msg = f'{directory},{file_name}'
+    #     send_w_ack(operation, msg, successor_ip, self.db_port)
 
     def _recv(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -57,35 +73,35 @@ class DataNode:
         print(f"_data_receive: EL MENSAJE QUE ESTA LLEGANDO EN DATA_NODE ES {msg}")
         msg = msg.split(',')
         operation = int(msg[0])
-        if operation == REPLICATE_STORE_DIRECTORY:
-            print(f"_data_receive: STORE DIRECTORY ES LA OPERACION")
-            conn.sendall(f"{OK}".encode())
-            directory_name = conn.recv(1024).decode()
-            self.replicated_directories[directory_name] = []
-            conn.sendall(f'{OK}'.encode())
+        # if operation == REPLICATE_STORE_DIRECTORY:
+        #     print(f"_data_receive: STORE DIRECTORY ES LA OPERACION")
+        #     conn.sendall(f"{OK}".encode())
+        #     directory_name = conn.recv(1024).decode()
+        #     self.replicated_directories[directory_name] = []
+        #     conn.sendall(f'{OK}'.encode())
 
-        elif operation == REPLICATE_DELETE_DIRECTORY:
-            print(f"_data_receive: DELETE DIRECTORY ES LA OPERACION")
-            conn.sendall(f"{OK}".encode())
-            directory_name = conn.recv(1024).decode()
-            deleted_directory = self.replicated_directories.pop(directory_name)
-            if deleted_directory:
-                conn.sendall(f'{OK}'.encode())
-            else:
-                print(f"EL DIRECTORIO {directory_name} NO EXISTE")
-
-
-        elif operation == REPLICATE_ADD_FILE:
-            conn.sendall(f'{OK}'.encode())
-            data = conn.recv(1024).decode().split(',')
-            directory_name = data[0]
-            file_name = data[1]
-            self.replicated_directories[directory_name].append(file_name)
-            conn.sendall(f'{OK}'.encode())
+        # elif operation == REPLICATE_DELETE_DIRECTORY:
+        #     print(f"_data_receive: DELETE DIRECTORY ES LA OPERACION")
+        #     conn.sendall(f"{OK}".encode())
+        #     directory_name = conn.recv(1024).decode()
+        #     deleted_directory = self.replicated_directories.pop(directory_name)
+        #     if deleted_directory:
+        #         conn.sendall(f'{OK}'.encode())
+        #     else:
+        #         print(f"EL DIRECTORIO {directory_name} NO EXISTE")
 
 
-        else:
-            print("NADA DE NADA")
+        # elif operation == REPLICATE_ADD_FILE:
+        #     conn.sendall(f'{OK}'.encode())
+        #     data = conn.recv(1024).decode().split(',')
+        #     directory_name = data[0]
+        #     file_name = data[1]
+        #     self.replicated_directories[directory_name].append(file_name)
+        #     conn.sendall(f'{OK}'.encode())
+
+
+        # else:
+        #     print("NADA DE NADA")
 
 
 
