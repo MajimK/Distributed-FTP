@@ -2,14 +2,14 @@ import socket
 from utils.utils_functions import getShaRepr
 import logging
 from utils.operations import *
-from utils.consts import PORT, FTP_PORT
+from utils.consts import DEFAULT_PORT, FTP_PORT
 # logger configuration
 #### here ####
 
 # no necesito el id en la referencia del nodo, es identificable perfectamente por el puerto y el ip
 # esto seria lo que es el nodo como tal de Chord, o sea, lo que se encierra en el cuadrado en los esquemas que he hecho
 class ChordNodeReference:
-    def __init__(self, ip: str, port: int = PORT, db_port: int = FTP_PORT ):
+    def __init__(self, ip: str, port: int = DEFAULT_PORT, db_port: int = FTP_PORT ):
         self.id = getShaRepr(ip)
         self.ip = ip
         self.port = port
@@ -133,16 +133,20 @@ class ChordNodeReference:
 
 
 
-    ###------- DATA ACCESS -------###
-    def store_directory(self,directory:str):
-        response = self._send_data(STOR,directory,True).decode()
-        return response
+    ###------- FTP -------###
+    # def store_directory(self,directory:str):
+    #     response = self._send_data(STOR,directory,True).decode()
+    #     return response
     
-    def delete_directory(self, directory: str):
-        response = self._send_data(DELE, directory, True).decode()
-        return response
+    # def delete_directory(self, directory: str):
+    #     response = self._send_data(DELE, directory, True).decode()
+    #     return response
 
     # def add_file(self, directory_name:str, file_name:str):
     #     response = self._send_data(ADD_FILE,f'{directory_name},{file_name}',True).decode()
     #     return response
+
+    def mkd(self, route:str):
+        response = self._send_data(f'{MKD}',f'{route}', True ).decode()
+        return response
 

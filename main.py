@@ -1,4 +1,3 @@
-from dht.chord import ChordNode
 from communication.chord_node_reference import ChordNodeReference
 import socket
 import sys

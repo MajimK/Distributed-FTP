@@ -5,16 +5,32 @@ class FileSystemEntity:
         self.name = name
         self.path = path
         self.size = size
+        self.files = []
+        self.directory = None
+
 
 class File(FileSystemEntity):  
-    def __init__(self, name, path, size) -> None:
+    def __init__(self, name, path, size, directory) -> None:
         super().__init__(name, path, size)
-        self.directory: Directory = None
+        self.directory: Directory = directory
         self.extension = None
-
         
 class Directory(FileSystemEntity):
-    def __init__(self, name, path, size) -> None:
+    def __init__(self, name, path, size, files: List[FileSystemEntity] = []) -> None:
         super().__init__(name, path, size)
         self.hash_name: str = getShaRepr(name)
-        self.files: List[FileSystemEntity] = []
+        self.files: List[FileSystemEntity] = files
+
+
+class FileData():
+    def __init__(self, path, size = 0, container = None) -> None:
+        self.path = path
+        self.size = size
+        self.container = container
+        pass
+
+    def __repr__(self) -> str:
+        return self.path
+    
+    def __str__(self) -> str:
+        return self.path
