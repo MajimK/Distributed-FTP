@@ -68,6 +68,14 @@ De coordinación hasta ahora hay implementado solamente la elección de líder, 
     3. Cuando este mensaje llega a las otras direcciones estas se dan por enteradas de que las elecciones comenzaron (corren el ```start_election``` ) se comparan con la que envió el mensaje y si son mayores entonces mandan un mensaje con el comando **FEEDBACK** dando a entender que se postulan para las elecciones como candidatas fuertes.
     4. Esto termina cuando llega a un nodo lo suficientemente "fuerte" y da por terminadas las elecciones con un mensaje de **COORDINATOR**, aquí cada nodo lo asume como coordinador (si están de acuerdo, o sea, si realmente es el mayor) y el proceso termina.
 
+### Almacenamiento y trabajo con datos:
+Los directorios y archivos del FTP se tratan, en lo que a almacenamiento respecta, de manera diferente, a continuación se explica el flujo del comando ```STOR``` para que se entienda:
+Cada ```DataNode``` posee su propiedad ```data```, esta es un diccionario que las llaves son rutas de directorios y los valores son otros diccionarios, estos últimos tienen como llave la ruta de un archivo y como valor una instancia de ```FileData```, que contiene toda la información que se requiere en el contexto FTP.
+Cuando el comando ```STOR``` es recibido hay dos pasos principales para el almacenamiento del dato:
+    1. Crear en la ruta ```app/database/ip_dueño_del_dato/own_data/``` la ruta que se pasa donde se almacenará el archivo (```current_dir```), por ejemplo, digamos que la ruta es /dir1/dir2/picture.png, entonces este quedaría almacenado de la siguiente manera ```app/database/ip_dueño_del_dato/own_data/dir1/dir2/picture.png```
+    2. En la propiedad ```data``` ahora se busca la carpeta, que en este ejemplo sería ```app/database/ip_dueño_del_dato/own_data/dir1/dir2/``` y en el diccionario que el corresponde como valor se guarda en la llave ```app/database/ip_dueño_del_dato/own_data/dir1/dir2/picture.png``` el valor de ```FileData``` que le corresponda
+
+Hacer notar que esta implementación se lleva a cabo de esta forma para facilitar comandos como ```LIST```, ya que ahora este consiste en dado el directorio que se va a listar, recorrer sus archivos por el diccionario que le corresponde como valor y se responde al comando con una cadena con toda la informacion guardada en ```FileData``` de manera estructurada.
 
 
 

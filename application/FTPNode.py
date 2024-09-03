@@ -6,7 +6,9 @@ from socket import socket
 from utils.operations import *
 from utils.utils_functions import *
 import time
+from datetime import datetime
 import os
+from utils.file_system import FileData
 from communication.chord_node_reference import ChordNodeReference
 
 class FTPNode(ChordNode):
@@ -34,13 +36,16 @@ class FTPNode(ChordNode):
         directory_hash_name = getShaRepr(directory_name)
         owner:ChordNodeReference = self.find_succ(directory_hash_name)
         successor = owner.succ  # to replicating data
+        file_data: FileData = FileData('drwxr-xr-x',os.path.basename(directory_name),0, datetime.now().strftime('%b %d %H:%M'))
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner.ip, DATABASE_PORT))
-        owner_socket.sendall(f'{MKD},{new_path},{successor.ip}'.encode())
+
+        owner_socket.sendall(f'{MKD},{new_path},{current_dir},{file_data},{successor.ip}'.encode())
         response = owner_socket.recv(1024).decode().strip()
 
         if response.startswith('220'):
-            socket.close()
+            print("220")
+            owner_socket.close()
             if client_socket:
                 client_socket.send(f'257 "{new_path}" created.\r\n'.encode())
 
@@ -64,9 +69,39 @@ class FTPNode(ChordNode):
     def _handle_rmd_command(self):
         pass
 
-    def _handle_stor_command(self, data: list, client_socket: socket.socket):
+    def _handle_stor_command(self, file_name: str, client_socket: socket.socket, current_dir, data_transfer_socket: socket):
+        file_path = os.path.join(current_dir,file_name)
+        file_hash_name = getShaRepr(file_name)
+        owner: ChordNodeReference = self.find_succ(file_hash_name)
+        successor = owner.succ
+        try:
+            owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            owner_socket.connect((owner.ip, DATABASE_PORT))
+            owner_socket.sendall(f'{STOR},{file_path},{successor.ip}'.encode())
+
+            response = owner_socket.recv(1024).decode().strip()
+            if response.startswith('220'):   
+                client_socket.send(b"150 Opening binary mode data connection for file transfer.\r\n")
+
+                owner_socket.send(b'220')
+
+                while True:
+                    data = data_transfer_socket.recv(4096)
+                    owner_socket.sendall(data)
+                    if not data:
+                        break
+                owner_socket.close()
+                if client_socket:
+                        client_socket.send(b"226 Transfer complete.\r\n")
+        
+            elif response.startswith('550'):
+                if client_socket:
+                    client_socket.send(b"550 File already exists.\r\n")
+                
+        except:
+            pass
+        
         pass
-    
     def _handle_quit_command(self):
         pass
 
@@ -88,6 +123,7 @@ class FTPNode(ChordNode):
     def receive_ftp_data(self, conn: socket, data: list):
         current_dir = os.path.normpath('/app/database')
         operation = data[0]
+        data_transfer_socket: socket = None
         print(f"receive_ftp_data: LA OPERACION ES {operation}")
         if operation == CWD:
             response = self._handle_stor_command(data[1:])  # route (implies mkd) or file
@@ -117,7 +153,10 @@ class FTPNode(ChordNode):
             response = self._handle_rmd_command()
 
         elif operation == STOR:
-            response = self._handle_stor_command()
+            if data_transfer_socket:
+                response = self._handle_stor_command(data[1],conn, current_dir, data_transfer_socket)
+                data_transfer_socket.close()
+                data_transfer_socket = None
         
         elif operation == SYST:
             conn.send(f'215 UNIX Type: L8\r\n'.encode())
@@ -147,7 +186,7 @@ class FTPNode(ChordNode):
         print("ENTRA A _TEST!!!!")
         if self.ip == '172.17.0.2':
             print("Almacenando directorio...")
-            r = self.ref.mkd("dir1/dir2").split(',')
+            r = self.ref.mkd("dir1").split(',')
             print(f"ESTO ES RESPONSE MILOCO: {r}")
 
             # r = self.ref.store_directory("dir2").split(',')
