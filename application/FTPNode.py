@@ -188,6 +188,7 @@ class FTPNode(ChordNode):
             print("Almacenando directorio...")
             r = self.ref.mkd("dir1").split(',')
             print(f"ESTO ES RESPONSE MILOCO: {r}")
+            # r = self.ref.stor("perro.jpg").split(',')
 
             # r = self.ref.store_directory("dir2").split(',')
             # print(f'ESTO ES LA SEGUNDA RESPONSE MILOCO: {r}')

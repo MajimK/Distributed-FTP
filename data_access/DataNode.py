@@ -7,6 +7,7 @@ import socket
 import time
 from utils.file_system import *
 import os
+
 class DataNode:
     def __init__(self, ip: str, db_port: int = DATABASE_PORT) -> None:
         self.ip = ip
@@ -14,8 +15,8 @@ class DataNode:
 
         
         
-        self.data: dict[dict[FileData]] = {'/app/database': {}}
-        self.replicated_data = {}
+        self.data: dict[dict[FileData]] = {}
+        self.replicated_data: dict[dict[FileData]] = {}
 
 
         threading.Thread(target=self._recv, daemon=True).start()
@@ -75,14 +76,29 @@ class DataNode:
 
     def _asign_filedata(self, directory, file_path, file_data, is_replication = False):
 
-        if directory in self.data if not is_replication else self.replicated_data:
+        data = self.data if not is_replication else self.replicated_data
+        if directory in data:
             print(f'_asign_filedata: EL DIRECTORIO {directory} EXISTE')
             dir = self.data[directory] if not is_replication else self.replicated_data[directory]
 
             dir[file_path] = file_data
-            return True
-        else:
+        elif directory == ROOT: #it's first time
+            print(f'_asign_filedata: EL DIRECTORIO {directory} NO EXISTE PERO ES ROOT')
+            if not is_replication:
+                self.data[directory] = {}
+                dirs = self.data[directory]
+                dirs[file_path] = file_data
+            else: 
+                print(f"ESTA REPLICANDO... entra con {directory} para replicar {file_path}")
+                self.replicated_data[directory] = {}
+
+                dirs = self.replicated_data[directory]
+                dirs[file_path] = file_data
+            
+        else: 
+            print("FALSO FALSO")
             return False
+        return True
 
     def _recv(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -142,7 +158,8 @@ class DataNode:
                 # print()
                 print(f"DIRECTORIO: {d}: {self.data[d]}")
             
-            print(f'REPLICATED DIRECTORIOS: {self.replicated_data.keys()}')
+            for rd in self.replicated_data.keys():
+                print(f'DIRECTORIO REPLICADO: {rd}: {self.replicated_data[rd]}')
             print("\n\n")
 
     # def make_directories(self, route: str, is_replicate = False):

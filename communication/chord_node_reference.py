@@ -149,4 +149,7 @@ class ChordNodeReference:
     def mkd(self, route:str):
         response = self._send_data(f'{MKD}',f'{route}', True ).decode()
         return response
+    
+    def stor(self, file_name:str):
+        response  = self._send_data(f'{STOR}, {file_name}', True).decode()
 
