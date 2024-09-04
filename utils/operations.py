@@ -39,9 +39,15 @@ QUIT = 'QUIT'
 #---------FTP---------#
 
 
+#--------AUXILIAR--------#
+STOR_FILEDATA = 'STOR_FILEDATA'
+#--------AUXILIAR--------#
+
+
 
 #---------REPLICATION---------#
 REPLICATE_STOR = 17
 REPLICATE_DELE = 18
 REPLICATE_MKD = 19
+REPLICATE_STORFILEDATA = 20
 #---------REPLICATION---------#

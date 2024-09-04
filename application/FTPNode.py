@@ -11,6 +11,9 @@ import os
 from utils.file_system import FileData
 from communication.chord_node_reference import ChordNodeReference
 
+# Hay que manejar en estos metodos todo el tiempo la posibilidad de que no se hayan hecho, o sea, que devuelvan 550
+
+
 class FTPNode(ChordNode):
     def __init__(self, ip: str, port: int = DEFAULT_PORT, ftp_port = FTP_PORT, m: int = 160):
         super().__init__(ip, port, m)
@@ -46,8 +49,13 @@ class FTPNode(ChordNode):
         if response.startswith('220'):
             print("220")
             owner_socket.close()
-            if client_socket:
-                client_socket.send(f'257 "{new_path}" created.\r\n'.encode())
+            if self.stor_filedata(current_dir, new_path, file_data, successor.ip, owner.ip):
+                print(f'257 "{new_path}" created.\r\n')
+                if client_socket:
+                    client_socket.send(f'257 "{new_path}" created.\r\n'.encode())
+            else:
+                if client_socket:
+                    client_socket.send(b"451 Requested action aborted: local error in processing.\r\n")
 
         else:
             if client_socket:
@@ -84,20 +92,25 @@ class FTPNode(ChordNode):
                 client_socket.send(b"150 Opening binary mode data connection for file transfer.\r\n")
 
                 owner_socket.send(b'220')
-
+                size = 0
                 while True:
                     data = data_transfer_socket.recv(4096)
                     owner_socket.sendall(data)
                     if not data:
                         break
+                    size += len(data)
+
                 owner_socket.close()
-                if client_socket:
-                        client_socket.send(b"226 Transfer complete.\r\n")
-        
-            elif response.startswith('550'):
-                if client_socket:
-                    client_socket.send(b"550 File already exists.\r\n")
-                
+                response = client_socket.recv(1024).strip()
+                if response.startswith('220'):
+                    file_data = FileData(f"-rw-r--r--", size, datetime.now().strftime('%b %d %H:%M'), {os.path.basename(file_name)})
+                    if self.stor_filedata(current_dir, file_path, file_data, successor.ip, owner.ip):
+                        if client_socket:
+                            client_socket.send(b"226 Transfer complete.\r\n")
+                    else:
+                        if client_socket:
+                            client_socket.send(b"451 Requested action aborted: local error in processing.\r\n")
+                 
         except:
             pass
         
@@ -153,8 +166,11 @@ class FTPNode(ChordNode):
             response = self._handle_rmd_command()
 
         elif operation == STOR:
+            file_name = data[1]
+            data_transfer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if data_transfer_socket:
-                response = self._handle_stor_command(data[1],conn, current_dir, data_transfer_socket)
+                response = self._handle_stor_command(file_name,conn, current_dir, data_transfer_socket)
+                
                 data_transfer_socket.close()
                 data_transfer_socket = None
         
@@ -180,7 +196,37 @@ class FTPNode(ChordNode):
 
     
 
-    
+
+    #-----------------AUXILIAR METHODS REGION-----------------#
+    # hice este metodo porque cuando voy a hacer el STOR se cosas del FileData despues de que llamé al metodo STOR en el DataNode
+    def stor_filedata(self, current_dir, file_path, filedata: FileData, successor_ip, owner_ip):
+            print('stor_filedata')
+        # try:
+            owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            owner_socket.connect((owner_ip, DATABASE_PORT))
+            owner_socket.send(f'{STOR_FILEDATA},{current_dir},{file_path},{filedata},{successor_ip}'.encode())
+
+            response = owner_socket.recv(1024)
+
+            if response.startswith('220'):
+                owner_socket.close()
+                return True
+            else:
+                return False
+            
+        # except Exception as e:
+        #     print(f"stor_filedata: {e}")
+        #     pass
+
+
+
+
+
+
+
+
+
+    #-----------------TEST METHODS REGION-----------------#
     def _test(self):
         time.sleep(8)
         print("ENTRA A _TEST!!!!")

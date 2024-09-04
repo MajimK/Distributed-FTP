@@ -24,36 +24,36 @@ class DataNode:
 
     
 
-    def owns_directory(self, directory_name: str):
-        return directory_name in self.files
-
-    
 
 
-        pass
     def handle_mkd_command(self, completed_path: str, current_dir, file_data: FileData, client_socket: socket.socket, successor_ip: str = None):
         try:
             if successor_ip:
                 self.data[completed_path] = {}
-                is_asigned = self._asign_filedata(current_dir, completed_path, file_data)
+                # is_asigned = self._asign_filedata(current_dir, completed_path, file_data)
             else:
                 self.replicated_data[completed_path] = {}
-                is_asigned = self._asign_filedata(current_dir, completed_path, file_data, True)
-            if is_asigned:
-                if successor_ip:
-                    client_socket.sendall(f'220'.encode())
-                    if successor_ip != self.ip:
-                        operation = f'{REPLICATE_MKD}'
-                        send_w_ack(operation, f'{completed_path},{current_dir},{file_data}', successor_ip, self.db_port)
+                # is_asigned = self._asign_filedata(current_dir, completed_path, file_data, True)
+            if successor_ip:
+                client_socket.sendall(f'220'.encode())
+                if successor_ip != self.ip:
+                    operation = f'{REPLICATE_MKD}'
+                    send_w_ack(operation, f'{completed_path},{current_dir},{file_data}', successor_ip, self.db_port)
+            else:
+                # mandar algún mensaje, controlar las respuestas mejor.
+                pass
+
         except Exception as e:
             print(f"handle_mkd_command: {e}")
             client_socket.send(f"403 Already exists".encode())
+
+
 
     def handle_stor_command(self, route: str, successor_ip:str, client_socket: socket.socket):
         try:
             path_without_root = route.split('/')[2:]
             path_without_root = '/'.join(path_without_root)
-            path = os.path.normpath("app/database/"+ self.ip + '/'+os.path.dirname(path_without_root))
+            path = os.path.normpath(ROOT+'/'+ self.ip + '/'+os.path.dirname(path_without_root))
             os.path.makedirs(path, exist_ok=True)
             complete_path = os.path.normpath(path+'/'+os.path.basename(path_without_root))
 
@@ -72,33 +72,34 @@ class DataNode:
 
         pass
 
-    
-
-    def _asign_filedata(self, directory, file_path, file_data, is_replication = False):
-
+    def handle_stor_filedata(self, current_directory, file_path, file_data, successor_ip:str=None):
+        is_replication = successor_ip is None
         data = self.data if not is_replication else self.replicated_data
-        if directory in data:
-            print(f'_asign_filedata: EL DIRECTORIO {directory} EXISTE')
-            dir = self.data[directory] if not is_replication else self.replicated_data[directory]
-
+        if current_directory in data:
+            print(f'_asign_filedata: EL DIRECTORIO {current_directory} EXISTE')
+            dir = self.data[current_directory] if not is_replication else self.replicated_data[current_directory]
             dir[file_path] = file_data
-        elif directory == ROOT: #it's first time
-            print(f'_asign_filedata: EL DIRECTORIO {directory} NO EXISTE PERO ES ROOT')
+        elif current_directory == ROOT: #it's first time
+            print(f'_asign_filedata: EL DIRECTORIO {current_directory} NO EXISTE PERO ES ROOT')
             if not is_replication:
-                self.data[directory] = {}
-                dirs = self.data[directory]
+                self.data[current_directory] = {}
+                dirs = self.data[current_directory]
                 dirs[file_path] = file_data
             else: 
-                print(f"ESTA REPLICANDO... entra con {directory} para replicar {file_path}")
-                self.replicated_data[directory] = {}
+                print(f"ESTA REPLICANDO... entra con {current_directory} para replicar {file_path}")
+                self.replicated_data[current_directory] = {}
 
-                dirs = self.replicated_data[directory]
+                dirs = self.replicated_data[current_directory]
                 dirs[file_path] = file_data
-            
-        else: 
-            print("FALSO FALSO")
+
+        else:
             return False
+        if not is_replication:
+                print(f'SUCCESSOR IP: {successor_ip}')
+                operation = f'{REPLICATE_STORFILEDATA}'
+                send_w_ack(operation, f'{current_directory},{file_path},{file_data}', successor_ip, self.db_port)
         return True
+
 
     def _recv(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -133,6 +134,14 @@ class DataNode:
             successor_ip = msg[2]
             self.handle_stor_command(route, successor_ip, conn)
 
+        elif operation == STOR_FILEDATA:
+            print("STOR_FILEDATA")
+            current_dir = msg[1]
+            file_path = msg[2]
+            file_data = msg[3]
+            successor_ip = msg[4]
+            self.handle_stor_filedata(current_dir, file_path, file_data, successor_ip)
+
         # replication section
         elif operation == REPLICATE_MKD:
             conn.sendall(f'{OK}'.encode())
@@ -143,6 +152,14 @@ class DataNode:
             self.handle_mkd_command(route, current_dir, file_data, conn)
             conn.sendall(f'{OK}'.encode())
 
+        elif operation == REPLICATE_STORFILEDATA:
+            conn.sendall(f'{OK}'.encode())
+            data = conn.recv(1024).decode().split(',')
+            current_directory = data[0]
+            file_path = data[1]
+            file_data = data[2]
+            self.handle_stor_filedata(current_directory,file_path,file_data)
+            conn.sendall(f'{OK}'.encode())
 
 
         else:
@@ -162,54 +179,4 @@ class DataNode:
                 print(f'DIRECTORIO REPLICADO: {rd}: {self.replicated_data[rd]}')
             print("\n\n")
 
-    # def make_directories(self, route: str, is_replicate = False):
-    #     route = route.split('/')[2:]
-    #     current_path = 'app'
-    #     prev_directory = 'app'
-    #     while route:
-    #         directory = route.pop(0)
-    #         current_path += '/' + directory
-    #         if not is_replicate:
-    #             if current_path not in self.files:
-    #                 self.files[current_path] = {}
-    #         else:
-    #             self.replicated_files[current_path] = FileData(directory, current_path, container=prev_directory)
-    #         prev_directory = directory
-        
-    # def store_file(self, current_directory, file_path, metadata):
-    #     self.files[current_directory] = FileData(metadata['name'], file_path, metadata['size'], container=current_directory)
-
-    # def delete_directory(self, directory_name: str, successor_ip: str):
-    #     deleted_direc = self.directories.pop(directory_name)
-    #     operation = f'{REPLICATE_DELETE_DIRECTORY}'
-    #     send_w_ack(operation, directory_name, successor_ip, self.db_port)
-
-    
-    # def add_file(self, directory: str, file_name:str, successor_ip):
-    #     print(f"add_file: EL DIRECTORIO ES {directory} Y EL FILE ES {file_name}")
-    #     self.directories[directory].append(file_name)
-    #     operation = f'{REPLICATE_ADD_FILE}'
-    #     msg = f'{directory},{file_name}'
-    #     send_w_ack(operation, msg, successor_ip, self.db_port)
-
-
-
-
-        # elif operation == REPLICATE_DELETE_DIRECTORY:
-        #     print(f"_data_receive: DELETE DIRECTORY ES LA OPERACION")
-        #     conn.sendall(f"{OK}".encode())
-        #     directory_name = conn.recv(1024).decode()
-        #     deleted_directory = self.replicated_directories.pop(directory_name)
-        #     if deleted_directory:
-        #         conn.sendall(f'{OK}'.encode())
-        #     else:
-        #         print(f"EL DIRECTORIO {directory_name} NO EXISTE")
-
-
-        # elif operation == REPLICATE_ADD_FILE:
-        #     conn.sendall(f'{OK}'.encode())
-        #     data = conn.recv(1024).decode().split(',')
-        #     directory_name = data[0]
-        #     file_name = data[1]
-        #     self.replicated_directories[directory_name].append(file_name)
-        #     conn.sendall(f'{OK}'.encode())
+   
