@@ -47,7 +47,26 @@ class DataNode:
             print(f"handle_mkd_command: {e}")
             client_socket.send(f"403 Already exists".encode())
 
+    def handle_rmd_command(self, route, successor_ip: str, client_socket: socket.socket):
+        if route in self.data:
+            dirs = self.data[route]
 
+            subdirs = list(dirs.items())
+
+            directories = []
+            files = []
+
+            for subdir, file_data in subdirs:
+                if file_data.is_dir():
+                    directories.append(subdir)
+                else:
+                    files.append(subdir)
+
+            response = '\n'.join(directories) + '\n' + END + '\n'.join(files)
+            client_socket.sendall(f'220 {response}'.encode())
+        
+        else:
+            client_socket.send(f"404 Not Found".encode())
 
     def handle_stor_command(self, route: str, successor_ip:str, client_socket: socket.socket):
         try:
@@ -100,7 +119,16 @@ class DataNode:
                 send_w_ack(operation, f'{current_directory},{file_path},{file_data}', successor_ip, self.db_port)
         return True
 
+    def handle_remove_directory(self, route, dir_name, successor_ip: str, client_socket: socket.socket):
+        if route in self.data:
+            dirs = self.data[route]
+            dirs.pop(dir_name)
+            self.data[route] = dirs
+            client_socket.sendall(f'220'.encode())
+        else:
+            client_socket.sendall(f'404 Not Found'.encode())
 
+        
     def _recv(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -141,6 +169,12 @@ class DataNode:
             file_data = msg[3]
             successor_ip = msg[4]
             self.handle_stor_filedata(current_dir, file_path, file_data, successor_ip)
+
+        elif operation == RMD:
+            print("RMD_COMMAND")
+            route = msg[1]
+            successor_ip = msg[2]
+            self.handle_rmd_command(route, successor_ip, conn)
 
         # replication section
         elif operation == REPLICATE_MKD:

@@ -2,9 +2,9 @@ import socket
 import os
 
 # Configuración del servidor FTP
-SERVER_IP = '127.0.0.1'  # Dirección IP del servidor FTP
+SERVER_IP = '172.17.0.2'  # Dirección IP del servidor FTP
 CONTROL_PORT = 21  # Puerto de control del servidor FTP
-DATA_PORT = 20  # Puerto de datos del servidor FTP (usualmente 20)
+DATA_PORT = 8008  # Puerto de datos del servidor FTP (usualmente 20)
 BUFFER_SIZE = 4096
 
 def send_command(client_socket, command):

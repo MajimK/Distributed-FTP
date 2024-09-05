@@ -11,7 +11,9 @@ class FileData():
         self.last_modification_date = last_modification_date
         self.name = name
 
-
+    def is_dir(self):
+        return self.permissions_and_type.startswith('d')
+    
     def __repr__(self) -> str:
         return f'{self.permissions_and_type} {self.hard_links} {self.user_id} {self.group_id} {self.size} {self.last_modification_date} {self.name}'
 

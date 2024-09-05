@@ -29,13 +29,20 @@ class FTPNode(ChordNode):
         pass
     
     def _handle_dele_command(self, data: list):
+
         pass
        
     def _handle_list_command(self):
+
         pass
     
     def _handle_mkd_command(self, directory_name, client_socket: socket.socket, current_dir):
-        new_path = os.path.normpath(os.path.join(current_dir, directory_name))
+        """This command causes the directory specified in the pathname
+            to be created as a directory (if the pathname is absolute)
+            or as a subdirectory of the current working directory (if
+            the pathname is relative)
+        """
+        new_path = os.path.normpath(os.path.join(current_dir, directory_name))  # no contemplo si la ruta es absoluta
         directory_hash_name = getShaRepr(directory_name)
         owner:ChordNodeReference = self.find_succ(directory_hash_name)
         successor = owner.succ  # to replicating data
@@ -74,7 +81,37 @@ class FTPNode(ChordNode):
     def _handle_retr_command(self):
         pass
 
-    def _handle_rmd_command(self):
+    def _handle_rmd_command(self, dir_path, current_dir, client_socket: socket.socket = None):
+        """Causes the directory specified in the pathname
+            to be removed as a directory (if the pathname is absolute)
+            or as a subdirectory of the current working directory (if
+            the pathname is relative)
+        """
+        new_path = os.path.join(current_dir, dir_path)
+        directory_hash_name = getShaRepr(dir_path)
+        owner: ChordNodeReference = self.find_succ(directory_hash_name)
+        successor = owner.succ
+        owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        owner_socket.connect((owner.ip, DATABASE_PORT))
+        owner_socket.sendall(f'{RMD},{new_path},{current_dir},{successor.ip}'.encode())
+
+        response = owner_socket.recv(1024).decode().strip()
+
+        if response.startswith('220'):
+            owner_socket.close()
+
+            lines = response[4:].split('\n')
+            end_directories = lines.index(END)
+            directories = lines[:end_directories] if end_directories != 0 else []
+            files = lines[end_directories+1:] if len(lines)-end_directories > 1 else []
+
+            for dir in directories:
+                self._handle_rmd_command(dir, os.path.normpath(os.path.dirname(dir)))
+            
+            for file in files:
+                self._handle_dele_command(file, os.path.normpath(os.path.dirname(file)))
+
+            
         pass
 
     def _handle_stor_command(self, file_name: str, client_socket: socket.socket, current_dir, data_transfer_socket: socket):
@@ -166,8 +203,10 @@ class FTPNode(ChordNode):
             response = self._handle_rmd_command()
 
         elif operation == STOR:
+            print('ENTRA A STOR!!!')
             file_name = data[1]
             data_transfer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            data_transfer_socket.connect((self.ip, DATA_TRANSFER_PORT))
             if data_transfer_socket:
                 response = self._handle_stor_command(file_name,conn, current_dir, data_transfer_socket)
                 
@@ -219,6 +258,12 @@ class FTPNode(ChordNode):
         #     pass
 
 
+
+        # def remove_directory(self, route, dir_name, successor_ip, owner_ip):
+        #     path = os.path.normpath(os.path.join(route, dir_name))
+        #     owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #     owner_socket.connect((owner_ip, DATABASE_PORT))
+        #     owner_socket.send(f'{REMOVE_DIR},{path},{route},{successor_ip}'.encode())
 
 
 

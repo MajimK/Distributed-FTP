@@ -41,6 +41,7 @@ QUIT = 'QUIT'
 
 #--------AUXILIAR--------#
 STOR_FILEDATA = 'STOR_FILEDATA'
+REMOVE_DIR = 'REMOVE_DIR'
 #--------AUXILIAR--------#
 
 
