@@ -48,6 +48,7 @@ class DataNode:
             client_socket.send(f"403 Already exists".encode())
 
     def handle_rmd_command(self, route, successor_ip: str, client_socket: socket.socket):
+        # route is the absolute path: current_dir/dir_to_remove
         if route in self.data:
             dirs = self.data[route]
 
@@ -63,6 +64,7 @@ class DataNode:
                     files.append(subdir)
 
             response = '\n'.join(directories) + '\n' + END + '\n'.join(files)
+            print(f"handle_rmd_command: LA RESPUESTA QUE SE ENVIARA DESDE EL DATANODE ES {response}")
             client_socket.sendall(f'220 {response}'.encode())
         
         else:
@@ -119,11 +121,16 @@ class DataNode:
                 send_w_ack(operation, f'{current_directory},{file_path},{file_data}', successor_ip, self.db_port)
         return True
 
-    def handle_remove_directory(self, route, dir_name, successor_ip: str, client_socket: socket.socket):
-        if route in self.data:
-            dirs = self.data[route]
-            dirs.pop(dir_name)
-            self.data[route] = dirs
+    def handle_remove_directory(self, absolute_path, current_dir, successor_ip: str, client_socket: socket.socket):
+        if current_dir in self.data:
+            dirs = self.data[current_dir]
+            for k in dirs.keys():
+                print(f'LLAVE: {k}')
+            print(f'LO QUE QUIERO INDEXAR ES: {absolute_path}')
+            dirs.pop(absolute_path)
+            self.data[current_dir] = dirs
+            self.data.pop(absolute_path)
+            
             client_socket.sendall(f'220'.encode())
         else:
             client_socket.sendall(f'404 Not Found'.encode())
@@ -175,6 +182,12 @@ class DataNode:
             route = msg[1]
             successor_ip = msg[2]
             self.handle_rmd_command(route, successor_ip, conn)
+        
+        elif operation == REMOVE_DIR:
+            path = msg[1]
+            current_dir = msg[2]
+            successor_ip = msg[3]
+            self.handle_remove_directory(path, current_dir, successor_ip, conn)
 
         # replication section
         elif operation == REPLICATE_MKD:

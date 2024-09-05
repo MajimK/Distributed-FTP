@@ -122,7 +122,6 @@ class ChordNodeReference:
         ip =response[1]
         return ChordNodeReference(ip, self.port)
     
-    ### FALTA RETRIEVE KEY & STORE KEY
 
     def __str__(self) -> str:
         return f'{self.id},{self.ip},{self.port}'
@@ -134,22 +133,16 @@ class ChordNodeReference:
 
 
     ###------- FTP -------###
-    # def store_directory(self,directory:str):
-    #     response = self._send_data(STOR,directory,True).decode()
-    #     return response
-    
-    # def delete_directory(self, directory: str):
-    #     response = self._send_data(DELE, directory, True).decode()
-    #     return response
-
-    # def add_file(self, directory_name:str, file_name:str):
-    #     response = self._send_data(ADD_FILE,f'{directory_name},{file_name}',True).decode()
-    #     return response
-
     def mkd(self, route:str):
         response = self._send_data(f'{MKD}',f'{route}', True ).decode()
         return response
     
     def stor(self, file_name:str):
-        response  = self._send_data(f'{STOR}, {file_name}', True).decode()
+        response  = self._send_data(f'{STOR}',f'{file_name}', True).decode()
+        return response
+    
+    def rmd(self, dir_name: str):
+        response = self._send_data(f'{RMD}',f'{dir_name}', True).decode()
+        return response
+    
 

@@ -1,3 +1,9 @@
 application/__pycache__/FTPNode.cpython-311.pyc
 data_access/__pycache__/DataNode.cpython-311.pyc
 utils/__pycache__/operations.cpython-311.pyc
+communication/__pycache__/chord_node_reference.cpython-311.pyc
+application/__pycache__/FTPNode.cpython-311.pyc
+data_access/__pycache__/DataNode.cpython-311.pyc
+utils/__pycache__/consts.cpython-311.pyc
+utils/__pycache__/file_system.cpython-311.pyc
+utils/__pycache__/operations.cpython-311.pyc

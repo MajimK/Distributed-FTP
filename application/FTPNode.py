@@ -87,13 +87,16 @@ class FTPNode(ChordNode):
             or as a subdirectory of the current working directory (if
             the pathname is relative)
         """
-        new_path = os.path.join(current_dir, dir_path)
+
+        absolute_path = os.path.join(current_dir, dir_path)
+        print(f'LA RUTA COMPLETA DEL DIRECTORIO PARA BORRAR ES: {absolute_path}')
         directory_hash_name = getShaRepr(dir_path)
         owner: ChordNodeReference = self.find_succ(directory_hash_name)
         successor = owner.succ
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner.ip, DATABASE_PORT))
-        owner_socket.sendall(f'{RMD},{new_path},{current_dir},{successor.ip}'.encode())
+        print(f"_handle_rmd_command: ENVIANDO RMD,{absolute_path},{current_dir} DESDE FTPNODE")
+        owner_socket.sendall(f'{RMD},{absolute_path},{successor.ip}'.encode())
 
         response = owner_socket.recv(1024).decode().strip()
 
@@ -110,8 +113,12 @@ class FTPNode(ChordNode):
             
             for file in files:
                 self._handle_dele_command(file, os.path.normpath(os.path.dirname(file)))
-
             
+            if self.remove_directory(absolute_path, current_dir, successor.ip, owner.ip):
+                client_socket.send(f'250 {absolute_path} deleted\r\n'.encode())
+        else:
+            if client_socket:
+                client_socket.send(b"550 Directory do not exists.\r\n")
         pass
 
     def _handle_stor_command(self, file_name: str, client_socket: socket.socket, current_dir, data_transfer_socket: socket):
@@ -200,7 +207,9 @@ class FTPNode(ChordNode):
             response = self._handle_retr_command()
 
         elif operation == RMD:
-            response = self._handle_rmd_command()
+            print("ENTRA A RMD")
+            dir_path = data[1]
+            response = self._handle_rmd_command(dir_path,current_dir, conn)
 
         elif operation == STOR:
             print('ENTRA A STOR!!!')
@@ -245,7 +254,7 @@ class FTPNode(ChordNode):
             owner_socket.connect((owner_ip, DATABASE_PORT))
             owner_socket.send(f'{STOR_FILEDATA},{current_dir},{file_path},{filedata},{successor_ip}'.encode())
 
-            response = owner_socket.recv(1024)
+            response = owner_socket.recv(1024).decode().strip()
 
             if response.startswith('220'):
                 owner_socket.close()
@@ -259,11 +268,17 @@ class FTPNode(ChordNode):
 
 
 
-        # def remove_directory(self, route, dir_name, successor_ip, owner_ip):
-        #     path = os.path.normpath(os.path.join(route, dir_name))
-        #     owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #     owner_socket.connect((owner_ip, DATABASE_PORT))
-        #     owner_socket.send(f'{REMOVE_DIR},{path},{route},{successor_ip}'.encode())
+    def remove_directory(self, absolute_path, current_dir, successor_ip, owner_ip):
+        owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        owner_socket.connect((owner_ip, DATABASE_PORT))
+        owner_socket.send(f'{REMOVE_DIR},{absolute_path},{current_dir},{successor_ip}'.encode())
+
+        response = owner_socket.recv(1024).decode().strip()   # aqui debo en algun momento controlar que el dir no este disponible
+        if response.startswith('220'):
+            owner_socket.close()
+            return True
+        else: return False
+
 
 
 
@@ -272,13 +287,20 @@ class FTPNode(ChordNode):
 
 
     #-----------------TEST METHODS REGION-----------------#
+    # implementar el CWD
     def _test(self):
         time.sleep(8)
         print("ENTRA A _TEST!!!!")
         if self.ip == '172.17.0.2':
             print("Almacenando directorio...")
             r = self.ref.mkd("dir1").split(',')
-            print(f"ESTO ES RESPONSE MILOCO: {r}")
+            print(f"RESPONSE DE MKD: {r}")
+            r = self.ref.mkd("dir2").split(',')
+            print(f"RESPONSE DE MKD: {r}")
+            # r = self.ref.mkd("dir1/dir3").split(',')
+            print(f"RESPONSE DE MKD: {r}")
+            # r = self.ref.rmd("database").split(',')
+            # print(f"RESPONSE DE RMD: {r}")
             # r = self.ref.stor("perro.jpg").split(',')
 
             # r = self.ref.store_directory("dir2").split(',')
