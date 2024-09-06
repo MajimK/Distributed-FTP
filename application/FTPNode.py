@@ -213,7 +213,7 @@ class FTPNode(ChordNode):
                 self._handle_port_command()
 
             elif operation == PWD:
-                self._handle_pwd_command()
+                conn.send(f'257 "{current_dir}" is the current directory.\r\n'.encode())
 
             elif operation == RETR:
                 self._handle_retr_command()
