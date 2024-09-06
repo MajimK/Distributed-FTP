@@ -158,6 +158,7 @@ class FTPNode(ChordNode):
             pass
         
         pass
+    
     def _handle_quit_command(self):
         pass
 
@@ -183,10 +184,19 @@ class FTPNode(ChordNode):
         print(f"receive_ftp_data: LA OPERACION ES {operation}")
         try:
             if operation == CWD:
-                self._handle_stor_command(data[1:])  # route (implies mkd) or file
+                new_path = os.path.normpath(data[1].strip())
+                if current_dir != os.path.normpath("/app/database") or new_path != "..":
+                    current_dir = os.path.normpath(os.path.join(current_dir, new_path))
 
             elif operation == DELE:
                 self._handle_dele_command(data[1:])
+
+            elif operation == FEAT:
+                features = '211 Features \r\n'
+                for cmd in commands:
+                    features += f'{cmd}\r\n'
+                features+= '211 End\r\n'
+                conn.sendall(features.encode())
             
             elif operation == LIST:
                 self._handle_list_command(data[1:])
@@ -195,6 +205,7 @@ class FTPNode(ChordNode):
                 print(f"ENTRA A MKD CON EL DIRECTORIO {data[1]}")
                 self._handle_mkd_command(data[1], conn, current_dir)
 
+    
             elif operation == PASV:
                 self._handle_pasv_command()
 
@@ -226,9 +237,21 @@ class FTPNode(ChordNode):
             elif operation == SYST:
                 conn.send(f'215 UNIX Type: L8\r\n'.encode())
 
+            elif operation == TYPE_A:
+                conn.sendall(b'200 Switching to ASCII mode.\r\n')
+
+            elif operation == TYPE_I:
+                conn.sendall(b'200 Switching to Binary mode.\r\n')
+
+            elif operation == USER:
+                conn.sendall(b'230 User logged in, proceed.\r\n')
+
+            elif operation == AUTH_TLS or operation == AUTH_SSL:
+                conn.sendall(b'500 Command not implemented.\r\n')
+
 
             elif operation == QUIT:
-                self._handle_quit_command()
+                conn.sendall(b'221 Goodbye\r\n')
 
 
 

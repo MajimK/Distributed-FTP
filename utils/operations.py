@@ -24,8 +24,11 @@ ENTRY_POINT = 16
 
 
 #---------FTP---------#
+AUTH_SSL = 'AUTH SSL'
+AUTH_TLS = 'AUTH TLS'
 CWD = 'CWD'
 DELE = 'DELE'
+FEAT = 'FEAT'
 LIST = 'LIST'
 MKD = 'MKD'
 PASV = 'PASV'
@@ -34,6 +37,9 @@ PWD = 'PWD'
 RETR = 'RETR'
 RMD = 'RMD'
 STOR = 'STOR'
+TYPE_A = 'TYPE A'
+TYPE_I = 'TYPE I'
+USER = 'USER'
 SYST = 'SYST'
 QUIT = 'QUIT'
 #---------FTP---------#
