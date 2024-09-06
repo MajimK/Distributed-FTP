@@ -21,7 +21,6 @@ class FTPNode(ChordNode):
         self.ftp_port: int = ftp_port
         self.data_node: DataNode = DataNode(ip)
 
-
         threading.Thread(target=self.start_ftp_server, daemon=True).start()
         threading.Thread(target=self._test, daemon=True).start()
 
@@ -182,65 +181,79 @@ class FTPNode(ChordNode):
         operation = data[0]
         data_transfer_socket: socket = None
         print(f"receive_ftp_data: LA OPERACION ES {operation}")
-        if operation == CWD:
-            response = self._handle_stor_command(data[1:])  # route (implies mkd) or file
+        try:
+            if operation == CWD:
+                self._handle_stor_command(data[1:])  # route (implies mkd) or file
 
-        elif operation == DELE:
-            response = self._handle_dele_command(data[1:])
+            elif operation == DELE:
+                self._handle_dele_command(data[1:])
+            
+            elif operation == LIST:
+                self._handle_list_command(data[1:])
+
+            elif operation == MKD:
+                print(f"ENTRA A MKD CON EL DIRECTORIO {data[1]}")
+                self._handle_mkd_command(data[1], conn, current_dir)
+
+            elif operation == PASV:
+                self._handle_pasv_command()
+
+            elif operation == PORT:
+                self._handle_port_command()
+
+            elif operation == PWD:
+                self._handle_pwd_command()
+
+            elif operation == RETR:
+                self._handle_retr_command()
+
+            elif operation == RMD:
+                print("ENTRA A RMD")
+                dir_path = data[1]
+                self._handle_rmd_command(dir_path,current_dir, conn)
+
+            elif operation == STOR:
+                print('ENTRA A STOR!!!')
+                file_name = data[1]
+                data_transfer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                data_transfer_socket.connect((self.ip, DATA_TRANSFER_PORT))
+                if data_transfer_socket:
+                    self._handle_stor_command(file_name,conn, current_dir, data_transfer_socket)
+                    
+                    data_transfer_socket.close()
+                    data_transfer_socket = None
+            
+            elif operation == SYST:
+                conn.send(f'215 UNIX Type: L8\r\n'.encode())
+
+
+            elif operation == QUIT:
+                self._handle_quit_command()
+
+
+
+
+
+
+            else:
+                print("receive_ftp_data: NADA DE NADA FTP")
+
         
-        elif operation == LIST:
-            response = self._handle_list_command(data[1:])
-
-        elif operation == MKD:
-            response = self._handle_mkd_command(data[1], conn, current_dir)
-
-        elif operation == PASV:
-            response = self._handle_pasv_command()
-
-        elif operation == PORT:
-            response = self._handle_port_command()
-
-        elif operation == PWD:
-            response = self._handle_pwd_command()
-
-        elif operation == RETR:
-            response = self._handle_retr_command()
-
-        elif operation == RMD:
-            print("ENTRA A RMD")
-            dir_path = data[1]
-            response = self._handle_rmd_command(dir_path,current_dir, conn)
-
-        elif operation == STOR:
-            print('ENTRA A STOR!!!')
-            file_name = data[1]
-            data_transfer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            data_transfer_socket.connect((self.ip, DATA_TRANSFER_PORT))
+        except ConnectionAbortedError:
+            print("Connection aborted by peer")
+        except ConnectionResetError:
+            print("Connection reset by peer")
+        finally:
             if data_transfer_socket:
-                response = self._handle_stor_command(file_name,conn, current_dir, data_transfer_socket)
-                
                 data_transfer_socket.close()
-                data_transfer_socket = None
+            conn.close()
+
         
-        elif operation == SYST:
-            conn.send(f'215 UNIX Type: L8\r\n'.encode())
-
-
-        elif operation == QUIT:
-            response = self._handle_quit_command()
-
-
-
-
-
-
-        else:
-            print("receive_ftp_data: NADA DE NADA FTP")
-
-        if response:
-            response = response.encode()
-            conn.sendall(response)
-        conn.close()
+        
+        # if response:
+        #     response = response.encode()
+        #     conn.sendall(response)
+        # conn.close()
 
     
 
@@ -293,13 +306,14 @@ class FTPNode(ChordNode):
         print("ENTRA A _TEST!!!!")
         if self.ip == '172.17.0.2':
             print("Almacenando directorio...")
-            r = self.ref.mkd("dir1").split(',')
-            print(f"RESPONSE DE MKD: {r}")
-            r = self.ref.mkd("dir2").split(',')
-            print(f"RESPONSE DE MKD: {r}")
+            self.ref.mkd("dir1")
+            print(f"SALIO DE MKD1")
+            self.ref.mkd("dir2")
+            print(f"SALIO DE MKD2")
             # r = self.ref.mkd("dir1/dir3").split(',')
-            print(f"RESPONSE DE MKD: {r}")
-            # r = self.ref.rmd("database").split(',')
+            self.ref.rmd("dir2")
+            print(f"SALIO DE RMD")
+
             # print(f"RESPONSE DE RMD: {r}")
             # r = self.ref.stor("perro.jpg").split(',')
 

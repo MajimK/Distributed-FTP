@@ -1,6 +1,5 @@
 import socket
-from utils.utils_functions import getShaRepr
-import logging
+from utils.utils_functions import getShaRepr, logger
 from utils.operations import *
 from utils.consts import DEFAULT_PORT, FTP_PORT
 # logger configuration
@@ -15,7 +14,7 @@ class ChordNodeReference:
         self.port = port
 
 
-    def _send_data(self, op: int, data: str = None, is_db_port = False):
+    def _send_data(self, op: int, data: str = None):
         """Internal function to send data to referenced node (self)
 
         Args:
@@ -25,18 +24,31 @@ class ChordNodeReference:
         Returns:
             bytes: Answer code 
         """
-        port = self.port if not is_db_port else FTP_PORT
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 print(f'sending {op}')
-                s.connect((self.ip, port))
+                s.connect((self.ip, DEFAULT_PORT))
                 s.sendall(f'{op},{data}'.encode('utf-8'))
-                return s.recv(1024)
+                response = s.recv(1024)
+                if op == MKD:
+                    print("_send_data: RESPONSE CHORD_NODE_REFERENCE: ", response)
+                return response
         except Exception as e:
             print(f"Error sending data: {e}")
             return b''
         
-    
+    def _send_data_ftp(self, op: int, data: str = None):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                print(f'sending {op}')
+                s.connect((self.ip, FTP_PORT))
+                s.sendall(f'{op},{data}'.encode('utf-8'))                
+        except Exception as e:
+            print(f"Error sending data: {e}")
+            return b''
+        
+
+
     def find_successor(self, id: int) -> 'ChordNodeReference':
         """Gets Chord node reference of the given node successor 
 
@@ -134,15 +146,13 @@ class ChordNodeReference:
 
     ###------- FTP -------###
     def mkd(self, route:str):
-        response = self._send_data(f'{MKD}',f'{route}', True ).decode()
-        return response
+        logger.debug(f'CHORD_NODE_REFERENCE: MKD {route}')
+        self._send_data_ftp(f'{MKD}',f'{route}')
     
     def stor(self, file_name:str):
-        response  = self._send_data(f'{STOR}',f'{file_name}', True).decode()
-        return response
+        self._send_data_ftp(f'{STOR}',f'{file_name}')
     
     def rmd(self, dir_name: str):
-        response = self._send_data(f'{RMD}',f'{dir_name}', True).decode()
-        return response
+        self._send_data_ftp(f'{RMD}',f'{dir_name}')
     
 

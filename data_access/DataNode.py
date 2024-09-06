@@ -122,18 +122,29 @@ class DataNode:
         return True
 
     def handle_remove_directory(self, absolute_path, current_dir, successor_ip: str, client_socket: socket.socket):
-        if current_dir in self.data:
-            dirs = self.data[current_dir]
-            for k in dirs.keys():
-                print(f'LLAVE: {k}')
-            print(f'LO QUE QUIERO INDEXAR ES: {absolute_path}')
-            dirs.pop(absolute_path)
-            self.data[current_dir] = dirs
-            self.data.pop(absolute_path)
-            
-            client_socket.sendall(f'220'.encode())
+        is_replication = successor_ip is None
+        if not is_replication:
+            if current_dir in self.data:
+                dirs = self.data[current_dir]
+                dirs.pop(absolute_path)
+                self.data[current_dir] = dirs
+                self.data.pop(absolute_path)
+                operation = f'{REPLICATE_REMOVE_DIR}'
+                print("LLAMANDO PARA REPLICAR ELIMINACION DE DIRECTORIO...")
+                send_w_ack(operation, f'{absolute_path},{current_dir}', successor_ip, self.db_port)
+
+                client_socket.sendall(f'220'.encode())
+            else:
+                client_socket.sendall(f'404 Not Found'.encode())
         else:
-            client_socket.sendall(f'404 Not Found'.encode())
+            if current_dir in self.replicated_data:
+                dirs = self.replicated_data[current_dir]
+                dirs.pop(absolute_path)
+                self.replicated_data[current_dir] = dirs
+                self.replicated_data.pop(absolute_path)
+                client_socket.sendall(f'220'.encode())
+            else:
+                client_socket.sendall(f'404 Not Found'.encode())
 
         
     def _recv(self):
@@ -206,6 +217,15 @@ class DataNode:
             file_path = data[1]
             file_data = data[2]
             self.handle_stor_filedata(current_directory,file_path,file_data)
+            conn.sendall(f'{OK}'.encode())
+
+        elif operation == REPLICATE_REMOVE_DIR:
+            print("REPLICATE_REMOVE_DIR")
+            conn.sendall(f'{OK}'.encode())
+            data = conn.recv(1024).decode().split(',')
+            abs_path = data[0]
+            current_dir = data[1]
+            self.handle_remove_directory(abs_path,current_dir,None, conn)
             conn.sendall(f'{OK}'.encode())
 
 
