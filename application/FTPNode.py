@@ -31,9 +31,28 @@ class FTPNode(ChordNode):
 
         pass
        
-    def _handle_list_command(self):
+    def _handle_list_command(self, current_dir: str, client_socket: socket.socket, data_transfer_socket: socket.socket):
+        owner = self.find_succ(current_dir)
+        owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        owner_socket.connect((owner.ip, DATABASE_PORT))
 
-        pass
+        owner_socket.sendall(f'{LIST},{current_dir}'.encode())
+        response = owner_socket.recv(1024).decode().strip()
+
+        if response.startswith('220'):
+            client_socket(f'150 Here comes the directory listing\r\n')
+            data = ""
+
+            while True:
+                data+= owner_socket.recv(4096).decode('utf-8')
+
+            data_transfer_socket.sendall(data.encode('utf-8'))
+            owner_socket.close()
+            client_socket.send(b"226 Directory send OK.\r\n")
+            print("Transfer complete")
+        else:
+            client_socket.send(b"550 Failed to list directory.\r\n")
+            
     
     def _handle_mkd_command(self, directory_name, client_socket: socket.socket, current_dir):
         """This command causes the directory specified in the pathname
@@ -199,7 +218,7 @@ class FTPNode(ChordNode):
                 conn.sendall(features.encode())
             
             elif operation == LIST:
-                self._handle_list_command(data[1:])
+                self._handle_list_command(current_dir)
 
             elif operation == MKD:
                 print(f"ENTRA A MKD CON EL DIRECTORIO {data[1]}")

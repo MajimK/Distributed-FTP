@@ -24,6 +24,33 @@ class DataNode:
 
     
 
+    def handle_list_command(self, current_dir, client_socket:socket.socket):
+        if current_dir in self.data:
+            dirs = self.data[current_dir]
+
+            try:
+                client_socket.send(f'220'.encode())
+                response = client_socket.recv(1024).decode()
+
+                if response.startswith('220'):
+                    result = []
+                    while True:
+                        try:
+                            result = list(dirs.values())
+                            break
+                        except Exception as e:
+                            print(f"handle_list_command: {e}")
+                    
+                    #no me queda claro que es asi como quiero acceder a los recursos->analizar
+
+                    client_socket.sendall('\n'.join(result).encode())   
+
+            except Exception as e:
+                print(f"handle_list_command: {e}")
+        
+        else:
+            client_socket.send(f"404 Not Found".encode())
+
 
 
     def handle_mkd_command(self, completed_path: str, current_dir, file_data: FileData, client_socket: socket.socket, successor_ip: str = None):
@@ -46,29 +73,6 @@ class DataNode:
         except Exception as e:
             print(f"handle_mkd_command: {e}")
             client_socket.send(f"403 Already exists".encode())
-
-    def handle_rmd_command(self, route, successor_ip: str, client_socket: socket.socket):
-        # route is the absolute path: current_dir/dir_to_remove
-        if route in self.data:
-            dirs = self.data[route]
-
-            subdirs = list(dirs.items())
-
-            directories = []
-            files = []
-
-            for subdir, file_data in subdirs:
-                if file_data.is_dir():
-                    directories.append(subdir)
-                else:
-                    files.append(subdir)
-
-            response = '\n'.join(directories) + '\n' + END + '\n'.join(files)
-            print(f"handle_rmd_command: LA RESPUESTA QUE SE ENVIARA DESDE EL DATANODE ES {response}")
-            client_socket.sendall(f'220 {response}'.encode())
-        
-        else:
-            client_socket.send(f"404 Not Found".encode())
 
     def handle_stor_command(self, route: str, successor_ip:str, client_socket: socket.socket):
         try:
@@ -146,6 +150,28 @@ class DataNode:
             else:
                 client_socket.sendall(f'404 Not Found'.encode())
 
+    def handle_rmd_command(self, route, successor_ip: str, client_socket: socket.socket):
+        # route is the absolute path: current_dir/dir_to_remove
+        if route in self.data:
+            dirs = self.data[route]
+
+            subdirs = list(dirs.items())
+
+            directories = []
+            files = []
+
+            for subdir, file_data in subdirs:
+                if file_data.is_dir():
+                    directories.append(subdir)
+                else:
+                    files.append(subdir)
+
+            response = '\n'.join(directories) + '\n' + END + '\n'.join(files)
+            print(f"handle_rmd_command: LA RESPUESTA QUE SE ENVIARA DESDE EL DATANODE ES {response}")
+            client_socket.sendall(f'220 {response}'.encode())
+        
+        else:
+            client_socket.send(f"404 Not Found".encode())
         
     def _recv(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
