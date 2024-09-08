@@ -7,10 +7,13 @@ import socket
 import time
 from utils.file_system import *
 import os
+import shutil
+import json
 
 class DataNode:
     def __init__(self, ip: str, db_port: int = DATABASE_PORT) -> None:
         self.ip = ip
+        self.id = getShaRepr(ip)
         self.db_port: int = db_port
 
         
@@ -24,7 +27,22 @@ class DataNode:
 
     
 
+    def save_data(self, is_replication: bool):
+        """Save this instance to a JSON file."""
+        file_name = 'data.json' if not is_replication else 'replicated_data.json'
+        root_dir = os.path.join(ROOT, self.ip)
+        file_path = os.path.join(root_dir, file_name)
+        data = self.data if not is_replication else self.replicated_data
+        
+        with open(file_path, 'w') as f:
+            json.dump(data, f)
+
+    
+
     def handle_list_command(self, current_dir, client_socket:socket.socket):
+        # with open('data_node.json', 'r') as f:
+        #     json_data = json.load(f)
+
         if current_dir in self.data:
             dirs = self.data[current_dir]
 
@@ -51,24 +69,25 @@ class DataNode:
         else:
             client_socket.send(f"404 Not Found".encode())
 
-
-
-    def handle_mkd_command(self, completed_path: str, current_dir, file_data: FileData, client_socket: socket.socket, successor_ip: str = None):
+    def handle_mkd_command(self, completed_path: str, current_dir, file_data: FileData, client_socket: socket.socket, successor_ip = None):
+        is_replication = successor_ip is None
         try:
-            if successor_ip:
+            if not is_replication:
                 self.data[completed_path] = {}
-                # is_asigned = self._asign_filedata(current_dir, completed_path, file_data)
             else:
+                print("REPLICA MKD")
                 self.replicated_data[completed_path] = {}
-                # is_asigned = self._asign_filedata(current_dir, completed_path, file_data, True)
-            if successor_ip:
+                
+            if not is_replication:
                 client_socket.sendall(f'220'.encode())
-                if successor_ip != self.ip:
-                    operation = f'{REPLICATE_MKD}'
-                    send_w_ack(operation, f'{completed_path},{current_dir},{file_data}', successor_ip, self.db_port)
+                operation = f'{REPLICATE_MKD}'
+                send_w_ack(operation, f'{completed_path},{current_dir},{file_data}', successor_ip, self.db_port)
             else:
                 # mandar algún mensaje, controlar las respuestas mejor.
                 pass
+            
+            self.save_data(is_replication)
+
 
         except Exception as e:
             print(f"handle_mkd_command: {e}")
@@ -100,16 +119,21 @@ class DataNode:
     def handle_stor_filedata(self, current_directory, file_path, file_data, successor_ip:str=None):
         is_replication = successor_ip is None
         data = self.data if not is_replication else self.replicated_data
+
         if current_directory in data:
             print(f'_asign_filedata: EL DIRECTORIO {current_directory} EXISTE')
             dir = self.data[current_directory] if not is_replication else self.replicated_data[current_directory]
             dir[file_path] = file_data
+        
         elif current_directory == ROOT: #it's first time
             print(f'_asign_filedata: EL DIRECTORIO {current_directory} NO EXISTE PERO ES ROOT')
+            
             if not is_replication:
                 self.data[current_directory] = {}
                 dirs = self.data[current_directory]
                 dirs[file_path] = file_data
+
+            
             else: 
                 print(f"ESTA REPLICANDO... entra con {current_directory} para replicar {file_path}")
                 self.replicated_data[current_directory] = {}
@@ -117,12 +141,14 @@ class DataNode:
                 dirs = self.replicated_data[current_directory]
                 dirs[file_path] = file_data
 
+
         else:
             return False
         if not is_replication:
                 print(f'SUCCESSOR IP: {successor_ip}')
                 operation = f'{REPLICATE_STORFILEDATA}'
                 send_w_ack(operation, f'{current_directory},{file_path},{file_data}', successor_ip, self.db_port)
+        self.save_data(is_replication)
         return True
 
     def handle_remove_directory(self, absolute_path, current_dir, successor_ip: str, client_socket: socket.socket):
@@ -146,9 +172,10 @@ class DataNode:
                 dirs.pop(absolute_path)
                 self.replicated_data[current_dir] = dirs
                 self.replicated_data.pop(absolute_path)
-                client_socket.sendall(f'220'.encode())
             else:
                 client_socket.sendall(f'404 Not Found'.encode())
+
+        self.save_data(is_replication) 
 
     def handle_rmd_command(self, route, successor_ip: str, client_socket: socket.socket):
         # route is the absolute path: current_dir/dir_to_remove
@@ -172,11 +199,85 @@ class DataNode:
         
         else:
             client_socket.send(f"404 Not Found".encode())
+
+
+    def migrate_data_to_new_node(self, new_node: 'DataNode', pred_node_id):
+        # migrate directories
+        for key in self.data.keys():
+            if inbetween(key, pred_node_id, new_node.id):
+                new_node.data[key] = self.data[key]
+                self.data.pop(key)
         
+        # migrate replicated directories
+        for key in self.replicated_data.keys():
+            new_node.replicated_data[key] = self.replicated_data[key]
+            self.replicated_data.pop(key)
+
+        # update self replicated data
+        for key in new_node.data:
+            self.replicated_data[key] = new_node.data[key]
+
+        
+        path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
+        new_node_path = os.path.normpath(ROOT + '/' + new_node.ip + '/' + 'DATA')
+       
+        # clean new node folder before copying
+        self.clean_folder(new_node_path) 
+
+        # migrate files
+        self.copy_folder_with_condition(path, new_node_path, new_node.id, pred_node_id)
+        
+        # clean new node replicated data folder before copying
+        new_node_replicated_path = os.path.normpath(ROOT + '/' + new_node.ip + '/' + 'REPLICATED_DATA')
+        self.clean_folder(new_node_replicated_path)
+         
+        # migrate replicated files
+        replicated_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
+        self.copy_files(replicated_path, new_node_replicated_path, True)
+        
+        # update replicated data of successor
+        self.copy_files(new_node_path, replicated_path)
+
+    def migrate_data_one_node(self, new_node: 'DataNode'):
+        keys_to_transfer = [k for k in self.data.keys()]
+        for key in keys_to_transfer:
+            hash_key = getShaRepr(key)
+            if inbetween(hash_key, self.id, new_node.id):    # if the key is in the interval (old_id, new_node.id]
+                new_node.data[key] = self.data[key]
+                del self.data[key]
+
+        # share replicated data
+        self.replicated_data = {}
+        new_node.replicated_data = {}
+
+        # update new node replicated data
+        for key in self.data.keys():
+            new_node.replicated_data[key] = self.data[key]
+
+        # update self replicated data
+        for key in new_node.data:
+            self.replicated_data[key] = new_node.data[key]
+
+        # clean new node folders before copying
+        new_node_path = os.path.normpath(ROOT + '/' + new_node.ip + '/' + 'DATA')
+        new_node_replicated_path = os.path.normpath(ROOT + '/' + new_node.ip + '/' + 'REPLICATED_DATA')
+        rep_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
+
+
+        self.clean_folder(new_node_path)
+        self.clean_folder(new_node_replicated_path)
+
+        # migrate files
+        source_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
+        self.copy_folder_with_condition_one(source_path,new_node_path, new_node.id, self.id, rep_path, new_node_replicated_path)        
+        
+
+
     def _recv(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((self.ip, self.db_port))
+        # print(f"Error: {e} - {self.ip} - {self.db_port}")
         s.listen(10)
 
         while True:
@@ -233,6 +334,7 @@ class DataNode:
             route = data[0]
             current_dir = data[1]
             file_data = data[2]
+            print("REPLICANDO MKD...")
             self.handle_mkd_command(route, current_dir, file_data, conn)
             conn.sendall(f'{OK}'.encode())
 
@@ -251,7 +353,8 @@ class DataNode:
             data = conn.recv(1024).decode().split(',')
             abs_path = data[0]
             current_dir = data[1]
-            self.handle_remove_directory(abs_path,current_dir,None, conn)
+            self.handle_remove_directory(abs_path,current_dir, None, conn)
+            print("REMOVIO CON REPLICATE_REMOVE_DIR")
             conn.sendall(f'{OK}'.encode())
 
 
@@ -259,7 +362,7 @@ class DataNode:
             print("NADA DE NADA")
 
 
-
+#------------------TEST------------------#
     def _prints(self):
         while True:
             time.sleep(10)
@@ -272,4 +375,53 @@ class DataNode:
                 print(f'DIRECTORIO REPLICADO: {rd}: {self.replicated_data[rd]}')
             print("\n\n")
 
-   
+
+
+   #------------------UTILS------------------#
+    def copy_files(self, source_path, dest_path, remove=False):
+        for file in os.listdir(source_path):
+            file_path = os.path.normpath(source_path + '/' + file)
+            new_path = os.path.normpath(dest_path + '/' + file)
+            shutil.copy2(file_path, new_path)
+            if remove:
+                os.remove(file_path)
+    
+    
+    def copy_folder_with_condition(self, source_path, dest_path, dest_id, pred_id):
+        for file in os.listdir(source_path):
+            file_path = os.path.normpath(source_path + '/' + file)
+            file_hash_path = getShaRepr(file_path)
+
+            if inbetween(file_hash_path, pred_id, dest_id): 
+                new_path = os.path.normpath(dest_path + '/' + file)
+                shutil.copy2(file_path, new_path)
+                os.remove(file_path)
+
+    def copy_folder_with_condition_one(self, source_path, dest_path, dest_id, pred_id, rep_source_path, rep_dest_path):
+        
+        for file in os.listdir(source_path):
+            file_path = os.path.normpath(source_path + '/' + file)
+            file_hash_path = getShaRepr(file_path)
+
+            if inbetween(file_hash_path, pred_id, dest_id): 
+                new_path = os.path.normpath(dest_path + '/' + file)
+                shutil.copy2(file_path, new_path)
+                os.remove(file_path)
+            else:
+                rep_file_path = os.path.normpath(rep_source_path + '/' + file)
+                new_path = os.path.normpath(rep_dest_path + '/' + file)
+                shutil.copy2(rep_file_path, new_path)
+                os.remove(rep_file_path)
+
+    def clean_folder(self, path):
+        # clean new node folder before copying
+        for file in os.listdir(path):
+            p = os.path.join(path, file)
+            os.remove(p) 
+
+    
+    def create_its_folder(self):
+        data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
+        os.makedirs(data_path, exist_ok=True)
+        replicated_data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
+        os.makedirs(replicated_data_path, exist_ok=True)

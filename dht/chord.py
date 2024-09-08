@@ -9,6 +9,8 @@ from utils.consts import *
 from data_access.DataNode import DataNode
 
 class ChordNode:
+    
+
     def __init__(self, ip: str, port: int = DEFAULT_PORT, m: int = 160):
         # el parametro election es solo para que tenga en cuenta todo lo de coordinacion.
         self.ip = ip
@@ -21,6 +23,7 @@ class ChordNode:
         self.finger = [self.ref] * self.m  # Finger table
         self.next = 0  # Finger table index to fix next
         self.elector: BroadcastElectorNode = BroadcastElectorNode(self.id)
+        self.data_node: DataNode = DataNode(ip)
         self._start_threads()
 
 
@@ -110,12 +113,14 @@ class ChordNode:
             self.succ = node.find_successor(self.id)
             self.elector.adopt_coordinator(node.get_coordinator())
             print(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
+            self.data_node.create_its_folder()
             self.succ.notify(self.ref)
             
             if self.succ.succ.id == self.succ.id:
                 self.succ.first_notify(self.ref)
                 self.pred = self.succ
         else:
+            self.data_node.create_its_folder()
             self.succ = self.ref
             self.pred = None
 
@@ -165,9 +170,16 @@ class ChordNode:
         else:
             if self.pred is None:
                 self.pred = node
+
+                self.data_node.migrate_data_one_node(node.ip)
+
             elif node.check_node():
                 if self._inbetween(node.id, self.pred.id, self.id):
+                    pred_id = self.pred.ip
                     self.pred  = node
+                    new_data_node = node.data_node
+                    print(new_data_node)
+                    self.data_node.migrate_data_to_new_node(new_data_node, pred_id)
        
         
 
@@ -204,33 +216,6 @@ class ChordNode:
                 self.pred = None
             time.sleep(10)
 
-
-    def store_key(self, key: str, value: str):
-        """Sotres key-value pair and replicates to the succ
-
-        Args:
-            key (str): The key
-            value (str): The value
-        """
-        key_hash = getShaRepr(key)
-        node = self.find_succ(key_hash)
-        node.store_key(key, value)
-        self.data[key] = value  
-        self.succ.store_key(key, value)
-
-
-    def retrieve_key(self, key: str) -> str:
-        """Retrieve key method to get a value for a given key.
-
-        Args:
-            key (str): The key
-
-        Returns:
-            str: The respective value
-        """
-        key_hash = getShaRepr(key)
-        node = self.find_succ(key_hash)
-        return node.retrieve_key(key)
 
 
     def start_server(self):
@@ -319,7 +304,7 @@ class ChordNode:
             self.notify_pred(ChordNodeReference(ip, self.port))
 
         elif option == CHECK_NODE:
-            data_resp =  self.ref
+            data_resp = self.ref
 
         elif option == FIRST_NOTIFY:
             ip = data[2]
@@ -329,9 +314,15 @@ class ChordNode:
             coord_ip = self.elector.get_coordinator()
             data_resp = ChordNodeReference(coord_ip)
 
+        elif option == GET_DATA_NODE:
+            data_resp = str(self.data_node)
+
+
         # Send response
         if data_resp:
-            response = f'{data_resp.id},{data_resp.ip}'.encode()
+            if option == GET_DATA_NODE:
+                response = f'{data_resp}'.encode()
+            else: response = f'{data_resp.id},{data_resp.ip}'.encode()
             conn.sendall(response)
             logger.debug(f"data_recieve: RESPUESTA ENVIADA\n")
         conn.close()

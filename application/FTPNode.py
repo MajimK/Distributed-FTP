@@ -19,7 +19,6 @@ class FTPNode(ChordNode):
         super().__init__(ip, port, m)
         
         self.ftp_port: int = ftp_port
-        self.data_node: DataNode = DataNode(ip)
 
         threading.Thread(target=self.start_ftp_server, daemon=True).start()
         threading.Thread(target=self._test, daemon=True).start()
@@ -61,8 +60,8 @@ class FTPNode(ChordNode):
             the pathname is relative)
         """
         new_path = os.path.normpath(os.path.join(current_dir, directory_name))  # no contemplo si la ruta es absoluta
-        directory_hash_name = getShaRepr(directory_name)
-        owner:ChordNodeReference = self.find_succ(directory_hash_name)
+        path_hash_name = getShaRepr(new_path)
+        owner:ChordNodeReference = self.find_succ(path_hash_name)
         successor = owner.succ  # to replicating data
         file_data: FileData = FileData('drwxr-xr-x',os.path.basename(directory_name),0, datetime.now().strftime('%b %d %H:%M'))
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

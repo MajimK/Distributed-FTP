@@ -1,4 +1,4 @@
-from operations import *
+from utils.operations import *
 
 DEFAULT_PORT = 8001
 BROADCAST_PORT = 8005
