@@ -9,6 +9,7 @@ from utils.file_system import *
 import os
 import shutil
 import json
+import errno
 
 class DataNode:
     def __init__(self, ip: str, db_port: int = DATABASE_PORT) -> None:
@@ -213,8 +214,13 @@ class DataNode:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try: 
             s.bind((self.ip, self.db_port))
+        except OSError as e:
+            if e.errno == errno.EADDRINUSE:
+                print(f"Still using {self.ip} - {self.db_port}...")
+            else:
+                print(f"Error {e} -> {self.ip} - {self.db_port}")
         except Exception as e:
-            print(f"Error_in_RECV: {e} - {self.ip} - {self.db_port}")
+            print(f"Error in _recv -> {e}")
         s.listen(10)
 
         while True:
@@ -345,7 +351,7 @@ class DataNode:
 
         # update successor replicated data
         succ_data_node.replicated_data = {}
-        succ_data_node.save_data()
+        succ_data_node.save_data(True)
         for key in self.data:
             succ_data_node.replicated_data[key] = self.data[key]
 
@@ -435,6 +441,7 @@ class DataNode:
         pred_data_node.load_jsons()
         succ_data_node = DataNode(succ_node_ip)
         succ_data_node.load_jsons()
+        self.load_jsons()
         
         # transfer files from replicated to data
         source_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
@@ -466,8 +473,11 @@ class DataNode:
         for key in self.data:
             succ_data_node.replicated_data[key] = self.data[key]
 
-        self.save_data(True)
+        print(f"SELF.DATA => {self.data}")
         self.save_data(False)
+        print(f"SELF.REPLICATED_DATA => {self.replicated_data}")
+        self.save_data(True)
+        print(f"PRED.REPLICATED_DATA => {pred_data_node.replicated_data}")
         succ_data_node.save_data(True)
                 
 
