@@ -354,6 +354,11 @@ class FTPNode(ChordNode):
             # r = self.ref.mkd("dir1/dir3").split(',')
             self.ref.rmd("dir2")
             print(f"SALIO DE RMD")
+            time.sleep(10)
+            print("VA PARA EL MKD DIR3")
+            self.ref.mkd("dir3")
+            print(f"SALIO DE RMD")
+            
 
             # print(f"RESPONSE DE RMD: {r}")
             # r = self.ref.stor("perro.jpg").split(',')

@@ -107,12 +107,12 @@ class ChordNode:
         Args:
             node (ChordNodeReference): The node
         """
-        if node:
+        if node is not None:
             logger.debug("join: EL NODO VIENE ESPECIFICADO!")
             self.pred = None
             self.succ = node.find_successor(self.id)
             self.elector.adopt_coordinator(node.get_coordinator())
-            print(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
+            logger.debug(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
             self.data_node.create_its_folder()
             self.succ.notify(self.ref)
             
@@ -171,15 +171,14 @@ class ChordNode:
             if self.pred is None:
                 self.pred = node
 
-                self.data_node.migrate_data_one_node(node.ip)
-
             elif node.check_node():
                 if self._inbetween(node.id, self.pred.id, self.id):
-                    pred_id = self.pred.ip
+                    pred_id = self.pred.id
                     self.pred  = node
-                    new_data_node = node.data_node
-                    print(new_data_node)
-                    self.data_node.migrate_data_to_new_node(new_data_node, pred_id)
+                    new_node_ip = node.ip
+                    succ_ip = self.succ.ip
+                    print(f'SELF.IP -> {self.ip} SELF.PRED.IP -> {self.pred.ip} SELF.SUCC.IP -> {self.succ.ip}')
+                    self.data_node.migrate_data_to_new_node(new_node_ip, pred_id, succ_ip)
        
         
 
@@ -197,24 +196,31 @@ class ChordNode:
         """
         self.succ = node
         self.pred = node
+        self.data_node.migrate_data_one_node(node.ip)
 
     def fix_fingers(self):
         pass
 
     def check_predecessor(self):
         while True:
-            try:
-                if self.pred and not self.pred.check_node():
+            # try:
+            if self.pred and not self.pred.check_node():
 
-                    logger.debug("check_predecessor: PREDECESOR PERDIDO\n")
-                    self.pred = self.find_pred(self.pred.id)
-                    self.pred.notify_pred(self.ref)
+                logger.debug("check_predecessor: PREDECESOR PERDIDO\n")
+                self.pred = self.find_pred(self.pred.id)
+                self.pred.notify_pred(self.ref)
+                if self.pred.id == self.id:
+                    self.pred = None
 
+                pred_ip = self.pred.ip if self.pred is not None else self.ip
+                self.data_node.migrate_data_cause_fall(pred_ip, self.succ.ip)
 
-            except Exception as e:
-                logger.debug(f"[XXX] check_predecessor: ENTRA A LA EXCEPCION: {e}\n")
-                self.pred = None
             time.sleep(10)
+
+
+            # except Exception as e:
+            #     logger.debug(f"[XXX] check_predecessor: ENTRA A LA EXCEPCION: {e}\n")
+            #     self.pred = None
 
 
 
