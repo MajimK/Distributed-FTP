@@ -6,11 +6,10 @@ from communication.chord_node_reference import ChordNodeReference
 from dht.election import BroadcastElectorNode
 from utils.operations import *
 from utils.consts import *
-from data_access.DataNode import DataNode
+from data_access.StaticDataNode import StaticDataNode
+from dht.coordinator import Coordinator
 
 class ChordNode:
-    
-
     def __init__(self, ip: str, port: int = DEFAULT_PORT, m: int = 160):
         # el parametro election es solo para que tenga en cuenta todo lo de coordinacion.
         self.ip = ip
@@ -23,7 +22,7 @@ class ChordNode:
         self.finger = [self.ref] * self.m  # Finger table
         self.next = 0  # Finger table index to fix next
         self.elector: BroadcastElectorNode = BroadcastElectorNode(self.id)
-        self.data_node: DataNode = DataNode(ip)
+        self.static_data_node: StaticDataNode = StaticDataNode(self.ip)
         self._start_threads()
 
 
@@ -113,16 +112,19 @@ class ChordNode:
             self.succ = node.find_successor(self.id)
             self.elector.adopt_coordinator(node.get_coordinator())
             logger.debug(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
-            self.data_node.create_its_folder()
+            self.static_data_node.create_its_folder()
             self.succ.notify(self.ref)
             
             if self.succ.succ.id == self.succ.id:
                 self.succ.first_notify(self.ref)
                 self.pred = self.succ
         else:
-            self.data_node.create_its_folder()
+            self.static_data_node.create_its_folder()
             self.succ = self.ref
             self.pred = None
+            self.elector.coordinator = self.ip
+            self.elector.coordinator_instance = Coordinator(self.ip)
+
 
 
     
@@ -178,7 +180,7 @@ class ChordNode:
                     new_node_ip = node.ip
                     succ_ip = self.succ.ip
                     print(f'SELF.IP -> {self.ip} SELF.PRED.IP -> {self.pred.ip} SELF.SUCC.IP -> {self.succ.ip}')
-                    self.data_node.migrate_data_to_new_node(new_node_ip, pred_id, succ_ip)
+                    self.static_data_node.migrate_data_to_new_node(new_node_ip, pred_id, succ_ip, self.elector.coordinator)
        
         
 
@@ -196,7 +198,7 @@ class ChordNode:
         """
         self.succ = node
         self.pred = node
-        self.data_node.migrate_data_one_node(node.ip)
+        self.static_data_node.migrate_data_one_node(node.ip, self.elector.coordinator)
 
     def fix_fingers(self):
         pass
@@ -213,7 +215,7 @@ class ChordNode:
                     self.pred = None
 
                 pred_ip = self.pred.ip if self.pred is not None else self.ip
-                self.data_node.migrate_data_cause_fall(pred_ip, self.succ.ip)
+                self.static_data_node.migrate_data_cause_fall(pred_ip, self.succ.ip, self.elector.coordinator)
 
             time.sleep(10)
 
@@ -283,8 +285,8 @@ class ChordNode:
         """
         data_resp = None
         option = int(data[0])
-        logger.debug(f'receive {option} from {data[1]}')
-        logger.debug(f'data: {data}')
+        # logger.debug(f'receive {option} from {data[1]}')
+        # logger.debug(f'data: {data}')
 
         if option == FIND_SUCCESSOR:
             id = int(data[1])
@@ -320,15 +322,10 @@ class ChordNode:
             coord_ip = self.elector.get_coordinator()
             data_resp = ChordNodeReference(coord_ip)
 
-        elif option == GET_DATA_NODE:
-            data_resp = str(self.data_node)
-
 
         # Send response
         if data_resp:
-            if option == GET_DATA_NODE:
-                response = f'{data_resp}'.encode()
-            else: response = f'{data_resp.id},{data_resp.ip}'.encode()
+            response = f'{data_resp.id},{data_resp.ip}'.encode()
             conn.sendall(response)
             logger.debug(f"data_recieve: RESPUESTA ENVIADA\n")
         conn.close()

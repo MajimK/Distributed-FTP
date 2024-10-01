@@ -19,7 +19,8 @@ class FTPNode(ChordNode):
         super().__init__(ip, port, m)
         
         self.ftp_port: int = ftp_port
-
+        self.data_node = DataNode(self.ip)
+        
         threading.Thread(target=self.start_ftp_server, daemon=True).start()
         threading.Thread(target=self._test, daemon=True).start()
 
@@ -61,12 +62,38 @@ class FTPNode(ChordNode):
         """
         new_path = os.path.normpath(os.path.join(current_dir, directory_name))  # no contemplo si la ruta es absoluta
         path_hash_name = getShaRepr(new_path)
+        print(f'HASH DE {new_path} ES {path_hash_name}')
         owner:ChordNodeReference = self.find_succ(path_hash_name)
         successor = owner.succ  # to replicating data
         file_data: FileData = FileData('drwxr-xr-x',os.path.basename(directory_name),0, datetime.now().strftime('%b %d %H:%M'))
+        
+        coordinator_ip = self.elector.coordinator
+        if coordinator_ip == None:
+            time.sleep(10)
+
+        coordinator_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        coordinator_socket.connect((coordinator_ip, COORDINATOR_PORT))
+        coordinator_socket.sendall(f'{REQUEST},{MKD} -> {new_path}'.encode('utf-8'))
+        max_tries = 5
+        coordinator_socket.settimeout(20)
+        permission_response = None
+        while permission_response != GRANT:
+            try:
+                permission_response = coordinator_socket.recv(1024).decode().strip()
+            except socket.timeout:
+                max_tries-=1
+                if max_tries == 0:
+                    print(f'MAX_TRIES = 0')
+                    self._handle_mkd_command(directory_name, client_socket, current_dir)
+                
+            print(f'IN WHILE -> permission_response: {permission_response}')
+        coordinator_socket.close()
+        print("MKD -> GRANT")
+
+        
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner.ip, DATABASE_PORT))
-
+        
         owner_socket.sendall(f'{MKD},{new_path},{current_dir},{file_data},{successor.ip}'.encode())
         response = owner_socket.recv(1024).decode().strip()
 
@@ -85,11 +112,19 @@ class FTPNode(ChordNode):
             if client_socket:
                 client_socket.send(b"550 Directory already exists.\r\n")
 
+        is_sent = secure_send(RELEASE, coordinator_ip, COORDINATOR_PORT, 5)
+        if is_sent:
+            print("RELEASE SENT...")
+        else:
+            print("NO SE MANDO ESTA PINGA DEL RELEASE")
+
+
 
     def _handle_pasv_command(self):
         pass
 
     def _handle_port_command(self):
+
         pass
 
     def _handle_pwd_command(self):
@@ -110,33 +145,62 @@ class FTPNode(ChordNode):
         directory_hash_name = getShaRepr(dir_path)
         owner: ChordNodeReference = self.find_succ(directory_hash_name)
         successor = owner.succ
+        
+        coordinator_ip = self.elector.coordinator
+        if coordinator_ip is None:
+            time.sleep(10)
+
+        coordinator_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        coordinator_socket.connect((coordinator_ip, COORDINATOR_PORT))
+        coordinator_socket.sendall(f'{REQUEST},{RMD}'.encode('utf-8'))
+
+        permission_response = None
+        while permission_response != GRANT:
+            permission_response = coordinator_socket.recv(1024).decode('utf-8').strip()
+            print("Waiting for resource...")
+        
+        coordinator_socket.close()
+        print('RMD -> GRANT')
+
+
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner.ip, DATABASE_PORT))
         print(f"_handle_rmd_command: ENVIANDO RMD,{absolute_path},{current_dir} DESDE FTPNODE")
         owner_socket.sendall(f'{RMD},{absolute_path},{successor.ip}'.encode())
 
         response = owner_socket.recv(1024).decode().strip()
-
+        print(f"RMD -> Response: {response}")
         if response.startswith('220'):
             owner_socket.close()
 
             lines = response[4:].split('\n')
             end_directories = lines.index(END)
-            directories = lines[:end_directories] if end_directories != 0 else []
+            print(f'END_DIRECTORIES -> {end_directories}')
+            directories = lines[:end_directories] if end_directories != 1 else []
+            print(f'DIRECTORIES TO DELETE -> {directories}')
             files = lines[end_directories+1:] if len(lines)-end_directories > 1 else []
+            print(f'FILES TO DELETE -> {files}')
 
             for dir in directories:
                 self._handle_rmd_command(dir, os.path.normpath(os.path.dirname(dir)))
             
             for file in files:
                 self._handle_dele_command(file, os.path.normpath(os.path.dirname(file)))
-            
+            print("SALE DEL CICLO DE BORRAR")
             if self.remove_directory(absolute_path, current_dir, successor.ip, owner.ip):
                 client_socket.send(f'250 {absolute_path} deleted\r\n'.encode())
+            print("SALE DEL REMOVE DIRECTORY")
         else:
             if client_socket:
                 client_socket.send(b"550 Directory do not exists.\r\n")
-        pass
+        print("SALE DE TODO")
+        is_sent = secure_send(RELEASE, coordinator_ip, COORDINATOR_PORT, 5)
+        print("ENVIA SECURE_SEND")
+        if is_sent:
+            print('RMD -> RELEASE SENT...')
+        else:
+            print('RMD -> NO SE MANDO NI CARAJO')
+        # no esta saliendo del RMD donde borra, ver eso.
 
     def _handle_stor_command(self, file_name: str, client_socket: socket.socket, current_dir, data_transfer_socket: socket):
         file_path = os.path.join(current_dir,file_name)
@@ -289,13 +353,6 @@ class FTPNode(ChordNode):
                 data_transfer_socket.close()
             conn.close()
 
-        
-        
-        # if response:
-        #     response = response.encode()
-        #     conn.sendall(response)
-        # conn.close()
-
     
 
 
@@ -343,7 +400,7 @@ class FTPNode(ChordNode):
     #-----------------TEST METHODS REGION-----------------#
     # implementar el CWD
     def _test(self):
-        time.sleep(8)
+        time.sleep(20)
         print("ENTRA A _TEST!!!!")
         if self.ip == '172.17.0.2':
             print("Almacenando directorio...")

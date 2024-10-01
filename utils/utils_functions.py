@@ -3,7 +3,7 @@ import socket
 import logging
 from utils.consts import *
 from typing import Dict, List
-OK = 1
+from utils.operations import OK
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 def getShaRepr(data: str):
     return int(hashlib.sha1(data.encode()).hexdigest(),16)
+
 
 def send_by_broadcast(message: str,closed=True, broadcast_port = BROADCAST_PORT):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -22,25 +23,41 @@ def send_by_broadcast(message: str,closed=True, broadcast_port = BROADCAST_PORT)
     
 
 def send_w_ack(first_msg: str, second_msg: str, target_ip: str, target_port: int):
-        """Sends two messages to target ip, always waiting for OK ack"""
+    """Sends two messages to target ip, always waiting for OK ack"""
         
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((target_ip, target_port))
-            s.sendall(first_msg.encode('utf-8'))
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((target_ip, target_port))
+        s.sendall(first_msg.encode('utf-8'))
+    
+        ack = s.recv(1024).decode('utf-8')
+        if ack != f"{OK}":
+            raise Exception("ACK NEGATIVO")
+        else:
+            print("ACK POSITIVO PARA EL PRIMER MENSAJE")
+        s.sendall(second_msg.encode('utf-8'))
         
-            ack = s.recv(1024).decode('utf-8')
-            if ack != f"{OK}":
-                raise Exception("ACK NEGATIVO")
-            else:
-                print("ACK POSITIVO PARA EL PRIMER MENSAJE")
-            s.sendall(second_msg.encode('utf-8'))
-            
-            ack = s.recv(1024).decode('utf-8')
-            # print(f'ACK: {ack}')
-            if ack != f"{OK}":
-                raise Exception(f"ACK NEGATIVO: {ack}")
-            else:
-                print("ACK POSITIVO PARA EL SEGUNDO MENSAJE")
+        ack = s.recv(1024).decode('utf-8')
+        # print(f'ACK: {ack}')
+        if ack != f"{OK}":
+            raise Exception(f"ACK NEGATIVO: {ack}")
+        else:
+            print("ACK POSITIVO PARA EL SEGUNDO MENSAJE")
+
+def secure_send(msg:str, target_ip: str, target_port: str, tries):
+     if tries == 0:
+         return False
+     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((target_ip, target_port))
+        s.sendall(f'{msg}'.encode('utf-8'))
+
+        ack = s.recv(1024).decode('utf-8')
+        if ack != f'{OK}':
+            print("NO ACK")
+            return secure_send(msg, target_ip, target_port, tries-1)
+        else: return True
+
+        
+        
 
 def bully(ip1, ip2):
     return int(ip1.split('.')[-1]) > int(ip2.split('.')[-1])
@@ -61,5 +78,9 @@ def inbetween(k: int, start: int, end: int) -> bool:
             return start < k <= end
         else:  # The interval wraps around 0
             return start < k or k <= end
-
+        
+def reset_coord_socket(s: socket.socket) -> socket.socket:
+    s.close()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    return s
 
