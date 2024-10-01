@@ -71,7 +71,7 @@ class StaticDataNode:
             response = s.recv(1024).decode('utf-8').strip()
             if response == GRANT or response == OK:
                 return True
-            # else: return False
+            else: return False
 
     def migrate_data_to_new_node(self, new_node_ip: str, pred_node_id, succ_node_ip, coordinator_ip):
         if self.send_message(REQUEST, 'new_node',coordinator_ip):

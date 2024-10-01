@@ -54,10 +54,12 @@ class DataNode:
 
         if current_dir in self.data:
             dirs = self.data[current_dir]
+            print(f'handle_list_command -> DIRS: {dirs}')
 
             try:
                 client_socket.send(f'220'.encode())
                 response = client_socket.recv(1024).decode()
+                print(f"handle_list_command -> RESPONSE: {response}")
 
                 if response.startswith('220'):
                     result = []
@@ -127,7 +129,7 @@ class DataNode:
 
         pass
 
-    def handle_stor_filedata(self, current_directory, file_path, file_data, successor_ip:str=None):
+    def handle_stor_filedata(self, current_directory, file_path, file_data, client_socket: socket.socket = None, successor_ip:str=None):
         is_replication = successor_ip is None
         data = self.data if not is_replication else self.replicated_data
 
@@ -143,7 +145,6 @@ class DataNode:
                 self.data[current_directory] = {}
                 dirs = self.data[current_directory]
                 dirs[file_path] = file_data
-
             
             else: 
                 print(f"ESTA REPLICANDO... entra con {current_directory} para replicar {file_path}")
@@ -159,6 +160,8 @@ class DataNode:
                 print(f'SUCCESSOR IP: {successor_ip}')
                 operation = f'{REPLICATE_STORFILEDATA}'
                 send_w_ack(operation, f'{current_directory},{file_path},{file_data}', successor_ip, self.db_port)
+                client_socket.send('220'.encode())
+
         self.save_data(is_replication)
         return True
 
@@ -250,7 +253,11 @@ class DataNode:
         except:
             operation = msg[0]
 
-        if operation == MKD:
+        if operation == LIST:
+            current_dir = msg[1]
+            self.handle_list_command(current_dir, conn)
+
+        elif operation == MKD:
             route = msg[1]
             current_dir = msg[2]
             file_data = msg[3]
@@ -268,7 +275,7 @@ class DataNode:
             file_path = msg[2]
             file_data = msg[3]
             successor_ip = msg[4]
-            self.handle_stor_filedata(current_dir, file_path, file_data, successor_ip)
+            self.handle_stor_filedata(current_dir, file_path, file_data, conn, successor_ip)
 
         elif operation == RMD:
             print("RMD_COMMAND")

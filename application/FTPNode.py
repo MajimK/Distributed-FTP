@@ -23,16 +23,32 @@ class FTPNode(ChordNode):
         
         threading.Thread(target=self.start_ftp_server, daemon=True).start()
         threading.Thread(target=self._test, daemon=True).start()
-
-    def _handle_cwd_command(self):
-        pass
     
     def _handle_dele_command(self, data: list):
 
         pass
        
     def _handle_list_command(self, current_dir: str, client_socket: socket.socket, data_transfer_socket: socket.socket):
-        owner = self.find_succ(current_dir)
+        current_dir_hash = getShaRepr(current_dir)
+        owner = self.find_succ(current_dir_hash)
+        
+        
+        coordinator_ip = self.elector.coordinator
+        if coordinator_ip is None:
+            time.sleep(10)
+
+        coordinator_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        coordinator_socket.connect((coordinator_ip, COORDINATOR_PORT))
+        coordinator_socket.sendall(f'{REQUEST},{LIST}'.encode('utf-8'))
+
+        permission_response = None
+        while permission_response != GRANT:
+            permission_response = coordinator_socket.recv(1024).decode('utf-8').strip()
+            print("Waiting for resource...")
+        
+        coordinator_socket.close()
+        print('LIST -> GRANT')
+        
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner.ip, DATABASE_PORT))
 
@@ -40,18 +56,40 @@ class FTPNode(ChordNode):
         response = owner_socket.recv(1024).decode().strip()
 
         if response.startswith('220'):
-            client_socket(f'150 Here comes the directory listing\r\n')
+            owner_socket.send('220'.encode())   # esto sobra creo
+            # client_socket.send(b'150 Here comes the directory listing\r\n')
             data = ""
-
-            while True:
-                data+= owner_socket.recv(4096).decode('utf-8')
-
-            data_transfer_socket.sendall(data.encode('utf-8'))
+            print("LIST LLEGA HASTA AQUI")
+            owner_socket.settimeout(5)
+            while True: 
+                try:
+                    chunk = owner_socket.recv(4096).decode('utf-8')
+                    print(f"CHUNK: {chunk}")
+                    data+= chunk
+                    if chunk == "":
+                        break
+                except TimeoutError:  # controlar mejor esto
+                    break
+            print("LIST -> SALE DEL WHILE TRUE")
+            # data_transfer_socket.sendall(data.encode('utf-8'))
             owner_socket.close()
-            client_socket.send(b"226 Directory send OK.\r\n")
-            print("Transfer complete")
+            try:
+                print(f'handle_list_command -> CLIENT_SOCKET: {client_socket}')
+                client_socket.send(b"226 Directory send OK.\r\n")
+            except BrokenPipeError:
+                print("Connection was closed by the client. Broken pipe.")
+                
+            # client_socket.send(b"226 Directory send OK.\r\n")
+            print("Transfer complete")  # funciona bien, pero client_socket se cierra o algo asi
+            print(data)
         else:
             client_socket.send(b"550 Failed to list directory.\r\n")
+
+        is_sent = secure_send(RELEASE, coordinator_ip, COORDINATOR_PORT, 5)
+        if is_sent:
+            print("LIST -> RELEASE SENT...")
+        else:
+            print("LIST -> NO SE MANDO RELEASE")
             
     
     def _handle_mkd_command(self, directory_name, client_socket: socket.socket, current_dir):
@@ -103,6 +141,7 @@ class FTPNode(ChordNode):
             if self.stor_filedata(current_dir, new_path, file_data, successor.ip, owner.ip):
                 print(f'257 "{new_path}" created.\r\n')
                 if client_socket:
+                    print("handle_mkd_command -> ENVIA AL CLIENTE")
                     client_socket.send(f'257 "{new_path}" created.\r\n'.encode())
             else:
                 if client_socket:
@@ -114,9 +153,9 @@ class FTPNode(ChordNode):
 
         is_sent = secure_send(RELEASE, coordinator_ip, COORDINATOR_PORT, 5)
         if is_sent:
-            print("RELEASE SENT...")
+            print("MKD -> RELEASE SENT...")
         else:
-            print("NO SE MANDO ESTA PINGA DEL RELEASE")
+            print("NO SE MANDO EL RELEASE EN MKD")
 
 
 
@@ -125,9 +164,6 @@ class FTPNode(ChordNode):
 
     def _handle_port_command(self):
 
-        pass
-
-    def _handle_pwd_command(self):
         pass
 
     def _handle_retr_command(self):
@@ -142,7 +178,7 @@ class FTPNode(ChordNode):
 
         absolute_path = os.path.join(current_dir, dir_path)
         print(f'LA RUTA COMPLETA DEL DIRECTORIO PARA BORRAR ES: {absolute_path}')
-        directory_hash_name = getShaRepr(dir_path)
+        directory_hash_name = getShaRepr(absolute_path)
         owner: ChordNodeReference = self.find_succ(directory_hash_name)
         successor = owner.succ
         
@@ -165,6 +201,7 @@ class FTPNode(ChordNode):
 
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner.ip, DATABASE_PORT))
+        print(owner.ip)
         print(f"_handle_rmd_command: ENVIANDO RMD,{absolute_path},{current_dir} DESDE FTPNODE")
         owner_socket.sendall(f'{RMD},{absolute_path},{successor.ip}'.encode())
 
@@ -188,7 +225,9 @@ class FTPNode(ChordNode):
                 self._handle_dele_command(file, os.path.normpath(os.path.dirname(file)))
             print("SALE DEL CICLO DE BORRAR")
             if self.remove_directory(absolute_path, current_dir, successor.ip, owner.ip):
+                print(f"handle_rmd_command -> {client_socket} XXX")
                 client_socket.send(f'250 {absolute_path} deleted\r\n'.encode())
+                print(f"handle_rmd_command -> SENT...")
             print("SALE DEL REMOVE DIRECTORY")
         else:
             if client_socket:
@@ -281,7 +320,14 @@ class FTPNode(ChordNode):
                 conn.sendall(features.encode())
             
             elif operation == LIST:
-                self._handle_list_command(current_dir)
+                # if data_transfer_socket is None:
+                #     data_transfer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                #     data_transfer_socket.connect((self.ip, DATA_TRANSFER_PORT))
+                self._handle_list_command(current_dir, conn, data_transfer_socket)
+                # if data_transfer_socket:
+                #     data_transfer_socket.close()
+                #     data_transfer_socket = None
+                
 
             elif operation == MKD:
                 print(f"ENTRA A MKD CON EL DIRECTORIO {data[1]}")
@@ -351,7 +397,7 @@ class FTPNode(ChordNode):
         finally:
             if data_transfer_socket:
                 data_transfer_socket.close()
-            conn.close()
+            # conn.close()
 
     
 
@@ -366,11 +412,16 @@ class FTPNode(ChordNode):
             owner_socket.send(f'{STOR_FILEDATA},{current_dir},{file_path},{filedata},{successor_ip}'.encode())
 
             response = owner_socket.recv(1024).decode().strip()
-
+            print(f'stor_filedata: RESPONSE: {response}')
             if response.startswith('220'):
+                print(f'stor_filedata: 220')
                 owner_socket.close()
+                print(f'stor_filedata: RETURN TRUE')
+
                 return True
             else:
+                print(f'stor_filedata: RETURN FALSE')
+
                 return False
             
         # except Exception as e:
@@ -411,10 +462,14 @@ class FTPNode(ChordNode):
             # r = self.ref.mkd("dir1/dir3").split(',')
             self.ref.rmd("dir2")
             print(f"SALIO DE RMD")
-            time.sleep(10)
-            print("VA PARA EL MKD DIR3")
+            # time.sleep(10)
+            # print("VA PARA EL MKD DIR3")
+            time.sleep(5)
             self.ref.mkd("dir3")
-            print(f"SALIO DE RMD")
+            print(f"SALIO DE MKD3")
+            time.sleep(2)
+            self.ref.list()
+            print('SALIO DEL LIST')
             
 
             # print(f"RESPONSE DE RMD: {r}")

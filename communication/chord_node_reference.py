@@ -155,4 +155,6 @@ class ChordNodeReference:
     def rmd(self, dir_name: str):
         self._send_data_ftp(f'{RMD}',f'{dir_name}')
     
+    def list(self):
+        self._send_data_ftp(f'{LIST}')
 
