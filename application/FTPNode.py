@@ -1,17 +1,17 @@
-from dht.chord import ChordNode
-from data_access.DataNode import DataNode
-from utils.consts import *
+import os
+import time
+import random
 import threading
 from socket import socket
+from utils.consts import *
 from utils.operations import *
-from utils.utils_functions import *
-import time
 from datetime import datetime
-import os
+from dht.chord import ChordNode
+from utils.utils_functions import *
 from utils.file_system import FileData
+from data_access.DataNode import DataNode
 from communication.chord_node_reference import ChordNodeReference
 
-# Hay que manejar en estos metodos todo el tiempo la posibilidad de que no se hayan hecho, o sea, que devuelvan 550
 
 
 class FTPNode(ChordNode):
@@ -159,8 +159,28 @@ class FTPNode(ChordNode):
 
 
 
-    def _handle_pasv_command(self):
-        pass
+    def _handle_pasv_command(self, client_socket:socket.socket,  port_range = (50000,50100)):
+        for port in random.sample(range(*port_range), port_range[1] - port_range[0]):
+            try:
+                data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                data_socket.bind(('0.0.0.0', port))  # checks which is available
+                break
+            except OSError:
+                continue
+        
+        data_socket.listen(1)
+        port = data_socket.getsockname()[1]
+        print(f'handle_pasv_command: PORT IS {port}')
+        
+        ip = '127,0,0,1'
+        p1, p2 = divmod(port, 256)
+        response = f'227 Entering Passive Mode ({ip},{p1},{p2}).\r\n'
+        print(f'handle_pasv_command: RESPONSE IS {response}')
+        client_socket.send(response.encode('utf-8'))
+
+        data_client, addr = data_socket.accept()
+        return data_client
+    
 
     def _handle_port_command(self):
 
@@ -337,7 +357,7 @@ class FTPNode(ChordNode):
 
     
             elif operation == PASV:
-                self._handle_pasv_command()
+                data_transfer_socket = self._handle_pasv_command(conn)
 
             elif operation == PORT:
                 self._handle_port_command()

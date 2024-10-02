@@ -57,25 +57,26 @@ def stor_file(file_name, server_ip, control_port, data_port):
     client_socket.settimeout(10)
 
     # Enviar comando para crear los data_transfer
-    command = f'MKD,dir1'
-    response = send_command(client_socket,command)
-    print(f'MKD dir1 Response: {response}')
-    time.sleep(3)
+    # command = f'MKD,dir1'
+    # response = send_command(client_socket,command)
+    # print(f'MKD dir1 Response: {response}')
+    # time.sleep(3)
 
-    command = f'MKD,dir2'
-    response = send_command(client_socket, command)
-    print(f'MKD dir2 Response: {response}')
-    time.sleep(8)
+    # command = f'MKD,dir2'
+    # response = send_command(client_socket, command)
+    # print(f'MKD dir2 Response: {response}')
+    # time.sleep(8)
 
-    command = f'RMD,dir2'
-    response = send_command(client_socket, command)
-    print(f'RMD dir2 Response: {response}')
-    time.sleep(2)
+    # command = f'RMD,dir2'
+    # response = send_command(client_socket, command)
+    # print(f'RMD dir2 Response: {response}')
+    # time.sleep(2)
 
     
     #print('VOY A ENTRAR A PORT')
-    # command = f'PORT'
-    #data_socket = pasv(command, client_socket)
+    command = f'PASV'
+    data_socket = send_command(client_socket, command)
+    print(data_socket)
 
 
     # Enviar comando STOR al servidor

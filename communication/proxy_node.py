@@ -8,7 +8,7 @@ def handle_client(client_socket: socket.socket):
     sd = SelfDiscovery(PROXY_IP)
     sd.find()
     target_ftp = sd.target_ip
-
+    # tengo que descubrir siempre
     if target_ftp is None:
         client_socket.send(b"421 No available nodes.\r\n")
         client_socket.close()
@@ -19,6 +19,7 @@ def handle_client(client_socket: socket.socket):
         ftp_socket.settimeout(10)
         while True:
             try:
+                # Analizar esto aqui para que cada vez que se reciba un comando haga esto, y no cada vez que se reciba una conexion
                 message = client_socket.recv(1024).decode().strip()
                 if message == '':
                     break
