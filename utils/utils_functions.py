@@ -79,8 +79,9 @@ def inbetween(k: int, start: int, end: int) -> bool:
         else:  # The interval wraps around 0
             return start < k or k <= end
         
-def reset_coord_socket(s: socket.socket) -> socket.socket:
+def reset_socket(s: socket.socket, target_ip, target_port) -> socket.socket:
     s.close()
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((target_ip, target_port))
     return s
 

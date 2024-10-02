@@ -23,7 +23,14 @@ class StaticDataNode:
 
         data_empty = False
         replicated_empty = False
-        
+        x = os.path.exists(replicated_data_file)
+        print(replicated_data_file)
+        print(f"load_data: REP_DATA_FILE -> {x}")
+
+        # if not os.path.exists(replicated_data_file) or not os.path.exists(data_file):
+        #     self.create_its_folder()
+
+
         if os.stat(replicated_data_file).st_size == 0:
             replicated_empty = True
             print(f"REPLICATED DATA FOR {self.ip} IS EMPTY.")
@@ -59,9 +66,13 @@ class StaticDataNode:
         data = self.data if not is_replication else self.replicated_data
 
         print(f"SAVE_DATA -> {self.data} AND IS_REPLICATION: {is_replication} AND DATA: {data}")
-
+        print(f"save_data: JSON CREADO EN {file_path}")
         with open(file_path, 'w') as f:
             json.dump(data, f)
+
+        with open(file_path, 'r') as f:
+            x = json.load(f)
+        print(f"save_data: INFO DEL JSON: {x}")
     
     
     def send_message(self, message:str, operation:str, coordinator_ip)->bool:
@@ -297,11 +308,23 @@ class StaticDataNode:
     
     def create_its_folder(self):
         data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
+        path_without_DATA = os.path.normpath(ROOT + '/' + self.ip)
+        if self.ip == '172.17.0.5':
+            print(f'create_its_folder: ENTRA CON IP {self.ip}')
         os.makedirs(data_path, exist_ok=True)
+        print(f'DATA DE {self.ip}: {data_path}')
         replicated_data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
         os.makedirs(replicated_data_path, exist_ok=True)
+        print(f'REP_DATA DE {self.ip}: {replicated_data_path}')
+
 
         self.save_data(True)
         self.save_data(False)
+        
+        x = os.path.exists(path_without_DATA+'/'+'data.json')
+        print(f'DATA.JSON EXISTE: {x}')
+        x = os.path.exists(path_without_DATA+'/'+'replicated_data.json')
+        print(f'REP_DATA.JSON EXISTE: {x}')
+
 
     
