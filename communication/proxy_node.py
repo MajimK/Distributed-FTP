@@ -40,7 +40,20 @@ def handle_client(client_socket: socket.socket, target_ftp):
                 client_socket.sendall(b'221 Goodbye\r\n')
 
             else: # controlar que sean los otros comandos ;)
-                client_socket.send(b'500 Syntax error, command unrecognized.\r\n')
+                if command in commands:
+                    ftp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    ftp_socket.connect((target_ftp, FTP_PORT))
+                    ftp_socket.settimeout(10)
+                    ftp_socket.sendall(command.encode('utf-8'))
+                    while True:
+                        response = ftp_socket.recv(1024).decode('utf-8')
+                        
+                        client_socket.sendall(response.encode('utf-8'))
+                        print(f"proxy_ftp -> Response: {response}")
+                        if response[0] == '2' or response[0] == '5':
+                            break
+                else:
+                    client_socket.send(b'500 Syntax error, command unrecognized.\r\n')
     
     except ConnectionAbortedError:
         print("Connection aborted by peer")
@@ -51,9 +64,7 @@ def handle_client(client_socket: socket.socket, target_ftp):
         client_socket.close()
 
     # try:
-        # ftp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # ftp_socket.client_socketect((target_ftp, FTP_PORT))
-        # ftp_socket.settimeout(10)
+        
         # client_socket.settimeout(5)
 
     

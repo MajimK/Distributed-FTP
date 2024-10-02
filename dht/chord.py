@@ -119,7 +119,7 @@ class ChordNode:
                 self.succ.first_notify(self.ref)
                 self.pred = self.succ
         else:
-            self.static_data_node.create_its_folder()
+            self.static_data_node.create_its_folder(True)
             self.succ = self.ref
             self.pred = None
             self.elector.coordinator = self.ip

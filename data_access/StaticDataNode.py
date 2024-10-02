@@ -306,17 +306,19 @@ class StaticDataNode:
 
     
     
-    def create_its_folder(self):
+    def create_its_folder(self, is_first = False):
         data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
         path_without_DATA = os.path.normpath(ROOT + '/' + self.ip)
-        if self.ip == '172.17.0.5':
-            print(f'create_its_folder: ENTRA CON IP {self.ip}')
+        
         os.makedirs(data_path, exist_ok=True)
         print(f'DATA DE {self.ip}: {data_path}')
         replicated_data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
         os.makedirs(replicated_data_path, exist_ok=True)
         print(f'REP_DATA DE {self.ip}: {replicated_data_path}')
 
+        if is_first:
+            self.data[ROOT] = {}
+            self.replicated_data[ROOT] = {}
 
         self.save_data(True)
         self.save_data(False)

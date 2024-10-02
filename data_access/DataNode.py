@@ -49,9 +49,11 @@ class DataNode:
     
 
     def handle_list_command(self, current_dir, client_socket:socket.socket):
-        # with open('data_node.json', 'r') as f:
-        #     json_data = json.load(f)
 
+        print(f'handle_list_DATA_NODE -> CURRENT_DIR: {current_dir}')
+        
+        self.load_jsons()
+        
         if current_dir in self.data:
             dirs = self.data[current_dir]
             print(f'handle_list_command -> DIRS: {dirs}')
@@ -72,13 +74,13 @@ class DataNode:
                     
                     #no me queda claro que es asi como quiero acceder a los recursos->analizar
 
-                    client_socket.sendall('\n'.join(result).encode())   
+                    client_socket.sendall('\n'.join(result).encode('utf-8'))   
 
             except Exception as e:
                 print(f"handle_list_command: {e}")
         
         else:
-            client_socket.send(f"404 Not Found".encode())
+            client_socket.send(f"404 Not Found".encode('utf-8'))
 
     def handle_mkd_command(self, completed_path: str, current_dir, file_data: FileData, client_socket: socket.socket, successor_ip = None):
         is_replication = successor_ip is None
