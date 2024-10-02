@@ -334,12 +334,6 @@ class FTPNode(ChordNode):
             elif operation == DELE:
                 self._handle_dele_command(data[1:])
 
-            elif operation == FEAT:
-                features = '211 Features \r\n'
-                for cmd in commands:
-                    features += f'{cmd}\r\n'
-                features+= '211 End\r\n'
-                conn.sendall(features.encode('utf-8'))
             
             elif operation == LIST:
                 # if data_transfer_socket is None:
@@ -384,24 +378,7 @@ class FTPNode(ChordNode):
                     data_transfer_socket.close()
                     data_transfer_socket = None
             
-            elif operation == SYST:
-                conn.send(f'215 UNIX Type: L8\r\n'.encode('utf-8'))
-
-            elif operation == TYPE_A:
-                conn.sendall(b'200 Switching to ASCII mode.\r\n')
-
-            elif operation == TYPE_I:
-                conn.sendall(b'200 Switching to Binary mode.\r\n')
-
-            elif operation == USER:
-                conn.sendall(b'230 User logged in, proceed.\r\n')
-
-            elif operation == AUTH_TLS or operation == AUTH_SSL:
-                conn.sendall(b'500 Command not implemented.\r\n')
-
-
-            elif operation == QUIT:
-                conn.sendall(b'221 Goodbye\r\n')
+            
 
 
 
