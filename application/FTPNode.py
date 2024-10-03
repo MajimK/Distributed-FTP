@@ -505,31 +505,31 @@ class FTPNode(ChordNode):
     #         print(f"SALIO DE RMD")
     #         # time.sleep(10)
     #         # print("VA PARA EL MKD DIR3")
-    #         # time.sleep(5)
-    #         # self.ref.mkd("dir3")
-    #         # print(f"SALIO DE MKD3")
-    #         # time.sleep(2)
-    #         # self.ref.list()
-    #         # print('SALIO DEL LIST')
+    #         time.sleep(5)
+    #         self.ref.mkd("dir3")
+    #         print(f"SALIO DE MKD3")
+    #         time.sleep(2)
+            # self.ref.list()
+            # print('SALIO DEL LIST')
             
 
-    #         # print(f"RESPONSE DE RMD: {r}")
-    #         # r = self.ref.stor("perro.jpg").split(',')
+            # print(f"RESPONSE DE RMD: {r}")
+            # r = self.ref.stor("perro.jpg").split(',')
 
-    #         # r = self.ref.store_directory("dir2").split(',')
-    #         # print(f'ESTO ES LA SEGUNDA RESPONSE MILOCO: {r}')
+            # r = self.ref.store_directory("dir2").split(',')
+            # print(f'ESTO ES LA SEGUNDA RESPONSE MILOCO: {r}')
 
-    #         # r = self.ref.add_file("dir2","dir2_file1")
-    #         # print(f'ESTO ES EL RESPONSE DE ADD FILE MILOCO: {r}')
+            # r = self.ref.add_file("dir2","dir2_file1")
+            # print(f'ESTO ES EL RESPONSE DE ADD FILE MILOCO: {r}')
         
-    #         # time.sleep(10)
-    #         # print("Otras operaciones...")
-    #         # r = self.ref.delete_directory("dir2").split(',')
-    #         # print(f"ESTO ES EL RESPONSE DE DELETE DIRECTORY MILOCO: {r}")
+            # time.sleep(10)
+            # print("Otras operaciones...")
+            # r = self.ref.delete_directory("dir2").split(',')
+            # print(f"ESTO ES EL RESPONSE DE DELETE DIRECTORY MILOCO: {r}")
 
 
-    #     else:
-    #         print("ENTRA SIENDO OTRO IP")
+        # else:
+        #     print("ENTRA SIENDO OTRO IP")
 
 
 

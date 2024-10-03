@@ -59,7 +59,7 @@ class StaticDataNode:
     
     def save_data(self, is_replication: bool):
         """Save this instance to a JSON file."""
-        
+        print(f'!!!!!!Para {self.ip} datos son -> {self.data} \n Replicados son -> {self.replicated_data}')
         file_name = 'data.json' if not is_replication else 'replicated_data.json'
         root_dir = os.path.join(ROOT, self.ip)
         file_path = os.path.join(root_dir, file_name)
@@ -84,67 +84,125 @@ class StaticDataNode:
                 return True
             else: return False
 
-    def migrate_data_to_new_node(self, new_node_ip: str, pred_node_id, succ_node_ip, coordinator_ip):
+    def migrate_data_to_new_node(self, new_node_ip: str, pred_node_ip, succ_node_ip, coordinator_ip):
         if self.send_message(REQUEST, 'new_node',coordinator_ip):
             self.load_data()
             # print("MIGRATE_DATA_TO_NEW_NODE: " + {self.ip})
+            print(f'ESTOS SON LOS IP PREDECESOR{pred_node_ip} Y SUCESOR{succ_node_ip}' )
             new_node = StaticDataNode(new_node_ip)
             new_node.load_data()
             succ_data_node = StaticDataNode(succ_node_ip)
             succ_data_node.load_data()
+            pred_data_node = StaticDataNode(pred_node_ip)
+            pred_data_node.load_data()
             print(f"CUANDO CARGA LOS DATOS SUCC_REP_DATA ES: {succ_data_node.replicated_data}")
+            
+            # remove my data from succ replicated data: 1
+            print('ESTOY EN MIGRATE DATA TO NEW NODE')
+            keys_to_transfer = [k for k in succ_data_node.replicated_data.keys()]
+            for key in keys_to_transfer:
+                if key in self.data:
+                    del succ_data_node.replicated_data[key]
 
-            # migrate directories
+            # Take their data: 2
             keys_to_transfer = [k for k in self.data.keys()]
             for key in keys_to_transfer:
                 hash_key = getShaRepr(key)
-                if inbetween(hash_key, pred_node_id, new_node.id):
+                if inbetween(hash_key, pred_data_node.id, new_node.id):
                     new_node.data[key] = self.data[key]
                     del self.data[key]
 
-            # migrate replicated directories
+            # Replicate data from pred: 3
+            keys_to_transfer = [k for k in pred_data_node.data.keys()]
+            for key in keys_to_transfer:
+                new_node.replicated_data[key] = pred_data_node.data[key]
+
+            # Replicate data from me: 4
+            keys_to_transfer = [k for k in self.data.keys()]
+            for key in keys_to_transfer:
+                new_node.replicated_data[key] = self.data[key]
+            
+            # Delete my duplicate replicated data except succ's data: 5
             keys_to_transfer = [k for k in self.replicated_data.keys()]
             for key in keys_to_transfer:
-                new_node.replicated_data[key] = self.replicated_data[key]
-                del self.replicated_data[key]
-
-            # update self replicated data
-            for key in new_node.data:
-                self.replicated_data[key] = new_node.data[key]
-
-            # update successor replicated data
-            succ_data_node.replicated_data = {}
-            succ_data_node.save_data(True)
-            for key in self.data:
-                succ_data_node.replicated_data[key] = self.data[key]
-
+                if key in succ_data_node.data:
+                    continue
+                if key in new_node.replicated_data:
+                    del self.replicated_data[key]
             
+            # Delete pred replicated data if exist in new node replicated data: 6
+            keys_to_transfer = [k for k in pred_data_node.replicated_data.keys()]
+            for key in keys_to_transfer:
+                if key in new_node.replicated_data:
+                    del pred_data_node.replicated_data[key]
+
+            # Copy my Data to succ's replicated data: 7
+            keys_to_transfer = [k for k in self.data.keys()]
+            for key in keys_to_transfer:
+                succ_data_node.replicated_data[key] = self.data[key]
+                print(f'SE HACE ESTO Y ESTA ES LA KEY --> {succ_data_node.replicated_data[key]}')
+
+            # Copy new node data to me and pred: 8
+            keys_to_transfer = [k for k in new_node.data.keys()]
+            for key in keys_to_transfer:
+                if key not in self.replicated_data:
+                    self.replicated_data[key] = new_node.data[key]
+                if key not in pred_data_node.replicated_data:
+                    pred_data_node.replicated_data[key]= new_node.data[key]
+
+            print('SE SUPONE QUE LLEGUE AQUI')
+            
+
+            # TRANSFER FILES
             path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
+            replicated_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
             new_node_path = os.path.normpath(ROOT + '/' + new_node.ip + '/' + 'DATA')
+            new_node_replicated_path = os.path.normpath(ROOT + '/' + new_node.ip + '/' + 'REPLICATED_DATA')
+            succ_node_path = os.path.normpath(ROOT + '/' + succ_data_node.ip + '/' + 'DATA')
+            succ_node_replicated_path = os.path.normpath(ROOT + '/' + succ_data_node.ip + '/' + 'REPLICATED_DATA')
+            pred_node_path = os.path.normpath(ROOT + '/' + pred_data_node.ip + '/' + 'DATA')
+            pred_node_replicated_path = os.path.normpath(ROOT + '/' + pred_data_node.ip + '/' + 'REPLICATED_DATA')
+
+            # 1
+            self.remove_duplicates(succ_node_replicated_path,path)
+
         
             # clean new node folder before copying
             self.clean_folder(new_node_path) 
 
-            # migrate files
-            self.copy_folder_with_condition(path, new_node_path, new_node.id, pred_node_id)
-            
+            # 2
+            self.copy_folder_with_condition(path, new_node_path, new_node.id, pred_data_node.ip)
             # clean new node replicated data folder before copying
-            new_node_replicated_path = os.path.normpath(ROOT + '/' + new_node.ip + '/' + 'REPLICATED_DATA')
             self.clean_folder(new_node_replicated_path)
-            
-            # migrate replicated files
-            replicated_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
-            self.copy_files(replicated_path, new_node_replicated_path, True)
-            
-            # update replicated data of successor
-            self.copy_files(new_node_path, replicated_path)
+
+            # 3
+            self.copy_files(path, new_node_replicated_path)
+            # 4
+            self.copy_files(pred_node_path, new_node_replicated_path)
+
+            # 5
+            self.remove_duplicates(new_node_replicated_path,succ_node_path,replicated_path)
+            # 6
+            self.remove_duplicates(pred_node_replicated_path,new_node_replicated_path)
+            # 7
+            self.copy_files(path,succ_node_replicated_path)
+
+            # 8
+            self.copy_files(new_node_path,replicated_path)
+            self.copy_files(new_node_path,pred_node_replicated_path)
 
             print(f'NEW NODE DATA: {new_node.data}')
             print(f'NEW NODE REPLICATED DATA: {new_node.replicated_data}')
             print(f'SELF DATA: {self.data}')
             print(f'SELF REPLICATED DATA: {self.replicated_data}')
             print(f'SUCC DATA: {succ_data_node.replicated_data}')
+
+            if pred_node_ip == succ_node_ip:
+                keys_to_transfer = [k for k in pred_data_node.replicated_data.keys()]
+                for key in keys_to_transfer:
+                    succ_data_node.replicated_data[key] = pred_data_node.replicated_data[key]
             
+            pred_data_node.save_data(True)
             succ_data_node.save_data(True)
             new_node.save_data(False)
             new_node.save_data(True)
@@ -159,6 +217,7 @@ class StaticDataNode:
             print("new_node -> NO SE PUDO REPLICAR!!!")
 
     def migrate_data_one_node(self, new_node_ip: str, coordinator_ip):
+        print('ENTRE EN MIGRATE DATA ONE NODE')
         if self.send_message(REQUEST, 'one_node', coordinator_ip):
             self.load_data()
             logger.debug(f"MIGRATE_DATA_ONE_NODE: {self.data}")
@@ -219,36 +278,60 @@ class StaticDataNode:
         succ_data_node = StaticDataNode(succ_node_ip)
         succ_data_node.load_data()
         self.load_data()
-        
-        # transfer files from replicated to data
-        source_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
-        dest_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
-        self.copy_files(source_path, dest_path, True)
 
-        # transfer directories from replicated to data
+        # transfer directories from replicated data: 1
         keys_to_transfer = [k for k in self.replicated_data.keys()]
         for key in keys_to_transfer:
+            if key in succ_data_node.data:
+                continue
             self.data[key] = self.replicated_data[key]
             del self.replicated_data[key]
 
-        # transfer files from pred to self replicated
-        pred_source_path = os.path.normpath(ROOT + '/' + pred_node_ip + '/' + 'DATA')
-        node_dest_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
-        self.copy_files(pred_source_path, node_dest_path)
+        # delete my data from pred an succ
+        keys_to_transfer = [k for k in pred_data_node.replicated_data.keys()]
+        for key in keys_to_transfer:
+            if key in self.data:
+                del pred_data_node.replicated_data[key]
+
+        keys_to_transfer = [k for k in succ_data_node.replicated_data.keys()]
+        for key in keys_to_transfer:
+            if key in self.data:
+                del succ_data_node.replicated_data[key]
         
+
         # transfer directories from pred to self replicated
-        for key in pred_data_node.data:
+        keys_to_transfer = [k for k in pred_data_node.data.keys()]
+        for key in keys_to_transfer:
                 self.replicated_data[key] = pred_data_node.data[key]
 
-        # transfer files from self to succ replicated 
-        node_source_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
-        succ_dest_path = os.path.normpath(ROOT + '/' + succ_node_ip + '/' + 'REPLICATED_DATA')
-        self.copy_files(node_source_path, succ_dest_path)
-
-
-        # transfer directories from self to succ replicated
-        for key in self.data:
+        # transfer directories from self to succ and pred replicated
+        keys_to_transfer = [k for k in self.data.keys()]
+        for key in keys_to_transfer:
             succ_data_node.replicated_data[key] = self.data[key]
+            pred_data_node.replicated_data[key] = self.data[key]
+
+        # transfer files from replicated to data
+        path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'DATA')
+        replicated_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
+        succ_node_path = os.path.normpath(ROOT + '/' + succ_data_node.ip + '/' + 'DATA')
+        succ_node_replicated_path = os.path.normpath(ROOT + '/' + succ_data_node.ip + '/' + 'REPLICATED_DATA')
+        pred_node_path = os.path.normpath(ROOT + '/' + pred_data_node.ip + '/' + 'DATA')
+        pred_node_replicated_path = os.path.normpath(ROOT + '/' + pred_data_node.ip + '/' + 'REPLICATED_DATA')
+
+        self.copy_files_not_dupl(replicated_path, path, succ_node_path)
+
+        self.remove_duplicates(pred_node_replicated_path, path)
+        self.remove_duplicates(succ_node_replicated_path, path)
+
+
+        # transfer files from pred to self replicated
+        self.copy_files(pred_node_path, replicated_path)
+
+        # transfer files from self to succ replicated 
+        self.copy_files(path, succ_node_replicated_path)
+        self.copy_files(path, pred_node_replicated_path)
+
+
 
         print(f"SELF.DATA => {self.data}")
         self.save_data(False)
@@ -256,6 +339,7 @@ class StaticDataNode:
         self.save_data(True)
         print(f"PRED.REPLICATED_DATA => {pred_data_node.replicated_data}")
         succ_data_node.save_data(True)
+        pred_data_node.save_data(True)
                 
 
 
@@ -269,8 +353,19 @@ class StaticDataNode:
             shutil.copy2(file_path, new_path)
             if remove:
                 os.remove(file_path)
+
     
-    
+    def copy_files_not_dupl(self, source_path, dest_path, verify_path):
+        verify_files = os.listdir(verify_path)
+        for file in os.listdir(source_path):
+            if file in verify_files:
+                continue
+            file_path = os.path.normpath(source_path + '/' + file)
+            new_path = os.path.normpath(dest_path + '/' + file)
+            shutil.copy2(file_path, new_path)
+            os.remove(file_path)
+
+
     def copy_folder_with_condition(self, source_path, dest_path, dest_id, pred_id):
         for file in os.listdir(source_path):
             file_path = os.path.normpath(source_path + '/' + file)
@@ -327,6 +422,22 @@ class StaticDataNode:
         print(f'DATA.JSON EXISTE: {x}')
         x = os.path.exists(path_without_DATA+'/'+'replicated_data.json')
         print(f'REP_DATA.JSON EXISTE: {x}')
+
+
+    def remove_duplicates(self, path_to_del, path_to_verify, path_of_data=None):
+        if path_of_data:
+            files_to_verify = os.listdir(path_to_verify)
+            files_to_delete = os.listdir(path_to_del)
+            for file in os.listdir(path_of_data):
+                if file in files_to_verify:
+                    continue
+                if file in files_to_delete:
+                    os.remove(file)
+        else:
+            files_origin = os.listdir(path_to_verify)
+            for file in os.listdir(path_to_del):
+                if file in files_origin:
+                    os.remove(file)
 
 
     

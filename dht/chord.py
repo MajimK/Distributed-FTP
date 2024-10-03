@@ -175,12 +175,12 @@ class ChordNode:
 
             elif node.check_node():
                 if self._inbetween(node.id, self.pred.id, self.id):
-                    pred_id = self.pred.id
+                    pred_ip = self.pred.ip
                     self.pred  = node
                     new_node_ip = node.ip
                     succ_ip = self.succ.ip
                     print(f'SELF.IP -> {self.ip} SELF.PRED.IP -> {self.pred.ip} SELF.SUCC.IP -> {self.succ.ip}')
-                    self.static_data_node.migrate_data_to_new_node(new_node_ip, pred_id, succ_ip, self.elector.coordinator)
+                    self.static_data_node.migrate_data_to_new_node(new_node_ip, pred_ip, succ_ip, self.elector.coordinator)
        
         
 
