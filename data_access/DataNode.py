@@ -108,26 +108,30 @@ class DataNode:
             print(f"handle_mkd_command: {e}")
             client_socket.send(f"403 Already exists".encode())
 
-    def handle_stor_command(self, route: str, successor_ip:str, client_socket: socket.socket):
+    def handle_stor_command(self, file_name: str, successor_ip:str, client_socket: socket.socket):
         try:
-            path_without_root = route.split('/')[2:]
-            path_without_root = '/'.join(path_without_root)
-            path = os.path.normpath(ROOT+'/'+ self.ip + '/'+os.path.dirname(path_without_root))
-            os.path.makedirs(path, exist_ok=True)
-            complete_path = os.path.normpath(path+'/'+os.path.basename(path_without_root))
+            # la ruta la estoy poniendo mal
+            path = os.path.normpath(ROOT+'/'+ self.ip + '/'  + 'DATA' + '/' + file_name)
+            # os.makedirs(path, exist_ok=True)
 
-            with open(complete_path, "wb") as file:
+            with open(path, "wb") as file:
                 client_socket.send(f'220'.encode())
-                response = client_socket.recv(1024)
+                response = client_socket.recv(1024).decode('utf-8')
                 if response.startswith('220'):
-                    while data:
+                    
+                    while True:
                         data = client_socket.recv(1024)
+                        print(f'handle_stor_command: DATA -> {data}')
                         if not data:
                             break
-
+                        # a esto le falta la replicacion pero no es tan dificil porque voy a copiar archivos.
                         file.write(data)
+
+            operation = f'{REPLICATE_STOR}'
+            send_w_ack(operation, path, successor_ip, self.db_port)
+
         except Exception as e:
-            print("Error:" + e)
+            print(f"Error: {e}")
 
         pass
 
@@ -222,7 +226,10 @@ class DataNode:
             client_socket.send(f"404 Not Found".encode())
 
 
-    
+    def handle_replicate_stor(self, file_path: str):
+            new_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA' + '/')
+            shutil.copy2(file_path, new_path)
+
 
     
 
@@ -310,6 +317,13 @@ class DataNode:
             file_data = data[2]
             self.handle_stor_filedata(current_directory,file_path,file_data)
             conn.sendall(f'{OK}'.encode())
+
+        elif operation == REPLICATE_STOR:
+            conn.sendall(f'{OK}'.encode())
+            data = conn.recv(1024).decode().split(',')
+            file_path = data[1]
+            self.handle_replicate_stor(file_path)
+            conn.sendall(OK.encode())
 
         elif operation == REPLICATE_REMOVE_DIR:
             print("REPLICATE_REMOVE_DIR")

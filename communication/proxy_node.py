@@ -5,11 +5,13 @@ import threading
 import socket
 
 def handle_client(client_socket: socket.socket, target_ftp):
-    current_dir = ROOT
     try:
         while True:
+            
             command = client_socket.recv(1024).decode('utf-8').strip()
             print(f'proxy_ftp -> command: {command}')
+            # if command == '':
+            #     continue
 
             if command == FEAT:
                 features = '211 Features \r\n'
@@ -18,8 +20,6 @@ def handle_client(client_socket: socket.socket, target_ftp):
                 features+= '211 End\r\n'
                 client_socket.sendall(features.encode('utf-8'))
 
-            elif command.startswith(PWD):
-                client_socket.send(f'257 "{current_dir}" is the current directory.\r\n'.encode('utf-8'))
             
             elif command.startswith(SYST):
                 client_socket.send(f'215 UNIX Type: L8\r\n'.encode('utf-8'))
@@ -40,18 +40,23 @@ def handle_client(client_socket: socket.socket, target_ftp):
                 client_socket.sendall(b'221 Goodbye\r\n')
 
             else: # controlar que sean los otros comandos ;)
-                if command in commands:
+                operation = command.split()[0]
+                    
+                print(f'proxy_ftp -> no operation {operation}')
+                if operation in commands:
                     ftp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     ftp_socket.connect((target_ftp, FTP_PORT))
-                    ftp_socket.settimeout(10)
+                    ftp_socket.settimeout(60)
                     ftp_socket.sendall(command.encode('utf-8'))
-                    while True:
-                        response = ftp_socket.recv(1024).decode('utf-8')
-                        
-                        client_socket.sendall(response.encode('utf-8'))
-                        print(f"proxy_ftp -> Response: {response}")
-                        if response[0] == '2' or response[0] == '5':
-                            break
+                    try:
+                        while True:
+                            response = ftp_socket.recv(1024).decode('utf-8')
+                            client_socket.sendall(response.encode('utf-8'))
+                            print(f"proxy_ftp -> Response: {response}")
+                            if response[0] == '2' or response[0] == '5':
+                                break
+                    except TimeoutError:
+                        print("TIMEOUT ERROR!!!!")
                 else:
                     client_socket.send(b'500 Syntax error, command unrecognized.\r\n')
     
@@ -59,51 +64,14 @@ def handle_client(client_socket: socket.socket, target_ftp):
         print("Connection aborted by peer")
     except ConnectionResetError:
         print("Connection reset by peer")
+    except ConnectionRefusedError:
+        # Hacer lo de buscar un nuevo target_ip
+        pass
     finally:
         print("-----------------------------")
         client_socket.close()
 
-    # try:
-        
-        # client_socket.settimeout(5)
-
-    
-    #     while True:
-    #         try:
-    #             # Analizar esto aqui para que cada vez que se reciba un comando haga esto, y no cada vez que se reciba una conexion
-    #             message = client_socket.recv(1024).decode().strip()
-    #             if message == '':
-    #                 break
-    #             else:
-    #                 while True:
-    #                     try:
-    #                         print(f'handle_client: MESSAGE TO FTP -> {message}')
-    #                         ftp_socket.sendall(message.encode('utf-8'))
-                        
-    #                         print(f'hadle_client: MESSAGE TO FTP SENT...')
-    #                         ftp_response= ftp_socket.recv(4096).decode('utf-8').strip()
-
-    #                         while True:
-    #                             try:
-    #                                 print(f'handle_client: FTP_RESPONSE -> {ftp_response}')
-    #                                 client_socket.sendall(ftp_response.encode('utf-8'))
-    #                             except TimeoutError:
-    #                                 continue
-    #                             finally: break
-    #                     except TimeoutError as e:
-    #                         ftp_socket = reset_socket(ftp_socket, target_ftp, FTP_PORT)
-    #                         continue
-
-    #         except Exception as e:
-    #             print(f'Error in handle_client -> proxy_node: {e}')
-    # except:
-    #     print(f'Error in handle_client -> proxy_node: {e}')
-
-    # finally:
-    #     client_socket.close()
-    #     ftp_socket.close()
-
-
+   
 def start_proxy_server():
     proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     proxy_socket.bind((PROXY_IP, PROXY_PORT))
