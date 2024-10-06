@@ -202,6 +202,23 @@ class DataNode:
 
         self.save_data(is_replication) 
 
+    def handle_retr_command(self, file_name :str, client_socket: socket.socket):
+        path = os.path.normpath("app/database/"+ self.ip + '/DATA/'+ file_name )
+        if os.path.isfile(path):
+            client_socket.send(b'225')
+            with open(path, 'rb') as file:
+                response = client_socket.recv(1024).decode().strip()
+                if response.startswith('230'):
+                    while True:
+                        data = file.read(1024)
+                        if not data:
+                            break
+                        client_socket.sendall(data)
+            client_socket.sendall(b'226 Transfer complete\r\n')
+
+        else:
+            client_socket.sendall(b'550 File not found\r\n')
+
     def handle_rmd_command(self, route, successor_ip: str, client_socket: socket.socket):
         # route is the absolute path: current_dir/dir_to_remove
         if route in self.data:
@@ -291,6 +308,11 @@ class DataNode:
             route = msg[1]
             successor_ip = msg[2]
             self.handle_rmd_command(route, successor_ip, conn)
+
+        elif operation == RETR:
+            print('RETR_COMMAND')
+            file_name = msg[1]
+            self.handle_retr_command(file_name,conn)
         
         elif operation == REMOVE_DIR:
             path = msg[1]

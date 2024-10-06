@@ -14,21 +14,16 @@ from data_access.DataNode import DataNode
 from communication.chord_node_reference import ChordNodeReference
 
 
+data_transfer_socket = None
+current_dir = ROOT
+current_dir_lock = Lock()
+data_transfer_lock = Lock()
+
 class FTPNode(ChordNode):
-    global data_transfer_socket
-    global current_dir
     def __init__(self, ip: str, port: int = DEFAULT_PORT, ftp_port = FTP_PORT, m: int = 160):
         super().__init__(ip, port, m)
-        global data_transfer_socket
-        global current_dir
         self.ftp_port: int = ftp_port
         self.data_node = DataNode(self.ip)
-        self.data_transfer_lock = Lock()
-        self.current_dir_lock = Lock()
-        with self.current_dir_lock:
-            current_dir = ROOT
-        with self.data_transfer_lock:
-            data_transfer_socket = None
 
         threading.Thread(target=self.start_ftp_server, daemon=True).start()
         # threading.Thread(target=self._test, daemon=True).start()
@@ -70,7 +65,7 @@ class FTPNode(ChordNode):
             owner_socket.send('220'.encode('utf-8'))   # esto sobra creo
             # secure_send(b'150 Here comes the directory listing\r\n', client_ip, client_port, 3)
             # client_socket = reset_socket(client_socket)
-            client_socket.sendall('150 Here comes the directory listing\r\n'.encode('utf-8'))
+            client_socket.sendall(b'150 Here comes the directory listing.\r\n')
             data = ""
             print("LIST LLEGA HASTA AQUI")
             owner_socket.settimeout(5)
@@ -88,7 +83,7 @@ class FTPNode(ChordNode):
             owner_socket.close()
             try:
                 print(f'handle_list_command -> CLIENT_SOCKET: {client_socket}')
-                client_socket.sendall("226 Directory send OK.\r\n".encode('utf-8'))
+                client_socket.sendall(b"226 Directory send OK.\r\n")
                 # secure_send(b"226 Directory send OK.\r\n", client_ip, client_port, 3)
             except BrokenPipeError:
                 print("Connection was closed by the client. Broken pipe.")
@@ -206,8 +201,28 @@ class FTPNode(ChordNode):
         return data_socket
 
 
-    def _handle_retr_command(self):
-        pass
+    def _handle_retr_command(self,current_dir,client_socket:socket.socket,file_name):
+        file_hash_name = getShaRepr(file_name)
+        
+
+        owner: ChordNodeReference = self.find_succ(file_hash_name)
+        try:
+            owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            owner_socket.connect((owner.ip, DATABASE_PORT))
+            owner_socket.sendall(f'{RETR},{file_name}'.encode())
+
+            response = owner_socket.recv(1024).decode().strip()
+            if response.startswith('225'):
+                owner_socket.send(b'230')
+                while True:
+                    data = owner_socket.recv(1024)
+                    if data.startswith('226'):
+                        break
+                    data_transfer_socket.send(data)
+            client_socket.sendall(f'226 Transfer complete\r\n'.encode())
+        except Exception as e:
+            print(f'ERROR: {e}')
+        
 
     def _handle_rmd_command(self, dir_path, current_dir, client_socket: socket.socket = None):
         """Causes the directory specified in the pathname
@@ -365,7 +380,7 @@ class FTPNode(ChordNode):
         try:
             if operation == CWD:
                 new_path = os.path.normpath(data[1].strip())
-                with self.current_dir_lock:
+                with current_dir_lock:
                     if current_dir != os.path.normpath("/app/database") or new_path != "..":
                         current_dir = os.path.normpath(os.path.join(current_dir, new_path))
                 conn.send(b'250 Directory successfully changed.\r\n')
@@ -375,10 +390,12 @@ class FTPNode(ChordNode):
 
             
             elif operation == LIST:
-                if data_transfer_socket:
-                    self._handle_list_command(current_dir, conn)
-                    data_transfer_socket.close()
-                    data_transfer_socket = None
+                with data_transfer_lock:
+                    if data_transfer_socket:
+                        logger.debug('recive_ftp_data: VA A LISTAR...')
+                        self._handle_list_command(current_dir, conn)
+                        data_transfer_socket.close()
+                        data_transfer_socket = None
                 
 
             elif operation == MKD:
@@ -387,13 +404,13 @@ class FTPNode(ChordNode):
 
     
             elif operation == PASV:
-                with self.data_transfer_lock:
+                with data_transfer_lock:
                     data_transfer_socket = self._handle_pasv_command(conn)
-                    print(f'receive_ftp_data -> data_transfer_socket: {data_transfer_socket}')
+                    logger.debug(f'receive_ftp_data -> data_transfer_socket: {data_transfer_socket}')
 
             elif operation == PORT:
                 addr = data[1]
-                with self.data_transfer_lock:
+                with data_transfer_lock:
                     self.data_transfer_socket = self._handle_port_command(addr)
                 conn.send(b'200 PORT command successful.\r\n')
 
@@ -401,7 +418,12 @@ class FTPNode(ChordNode):
                 conn.send(f'257 "{current_dir}" is the current directory.\r\n'.encode('utf-8'))
 
             elif operation == RETR:
-                self._handle_retr_command()
+                file_name  = data[1]
+                with data_transfer_lock:
+                    if data_transfer_socket:
+                        self._handle_retr_command(current_dir, conn,file_name )
+                        data_transfer_socket.close()
+                        data_transfer_socket = None
 
             elif operation == RMD:
                 print("ENTRA A RMD")
@@ -411,7 +433,7 @@ class FTPNode(ChordNode):
             elif operation == STOR:
                 print('ENTRA A STOR!!!')
                 file_name = data[1]
-                with self.data_transfer_lock:
+                with data_transfer_lock:
                     if data_transfer_socket:
                         self._handle_stor_command(file_name,conn, current_dir)                        
                         data_transfer_socket.close()

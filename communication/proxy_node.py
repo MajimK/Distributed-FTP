@@ -4,12 +4,15 @@ from utils.utils_functions import logger, reset_socket
 import threading
 import socket
 
+# target_ip = None
 def handle_client(client_socket: socket.socket, target_ftp):
+    # global target_ip
+    # target_ip = target_ftp
     try:
         while True:
             
             command = client_socket.recv(1024).decode('utf-8').strip()
-            print(f'proxy_ftp -> command: {command}')
+            logger.debug(f'proxy_ftp -> command: {command}')
             # if command == '':
             #     continue
 
@@ -42,45 +45,53 @@ def handle_client(client_socket: socket.socket, target_ftp):
             else: # controlar que sean los otros comandos ;)
                 operation = command.split()[0]
                     
-                print(f'proxy_ftp -> no operation {operation}')
+                logger.debug(f'proxy_ftp -> no operation {operation}')
                 if operation in commands:
                     ftp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     ftp_socket.connect((target_ftp, FTP_PORT))
-                    ftp_socket.settimeout(60)
+                    ftp_socket.settimeout(10)
                     ftp_socket.sendall(command.encode('utf-8'))
                     try:
                         while True:
                             response = ftp_socket.recv(1024).decode('utf-8')
                             client_socket.sendall(response.encode('utf-8'))
-                            print(f"proxy_ftp -> Response: {response}")
+                            logger.debug(f"proxy_ftp -> Response: {response}")
                             if response[0] == '2' or response[0] == '5':
+                                ftp_socket.close()
                                 break
                     except TimeoutError:
-                        print("TIMEOUT ERROR!!!!")
+                        logger.debug("TIMEOUT ERROR!!!!")
+                        ftp_socket.close()
                 else:
                     client_socket.send(b'500 Syntax error, command unrecognized.\r\n')
     
     except ConnectionAbortedError:
-        print("Connection aborted by peer")
+        logger.debug("Connection aborted by peer")
     except ConnectionResetError:
-        print("Connection reset by peer")
+        logger.debug("Connection reset by peer")
     except ConnectionRefusedError:
-        # Hacer lo de buscar un nuevo target_ip
+        logger.debug("Connection to FTP Node is refused")
+        # target_ip = None
+        
+
         pass
     finally:
-        print("-----------------------------")
+        logger.debug("-----------------------------")
         client_socket.close()
 
-   
+
+
 def start_proxy_server():
+    # global target_ip
     proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     proxy_socket.bind((PROXY_IP, PROXY_PORT))
     proxy_socket.listen(5)
-    print(f"Proxy FTP listening on {PROXY_IP}:{PROXY_PORT}")
+    logger.debug(f"Proxy FTP listening on {PROXY_IP}:{PROXY_PORT}")
 
     sd = SelfDiscovery(PROXY_IP)
     sd.find()
     target_ftp = sd.target_ip
+    # target_ip = target_ftp
     # tengo que descubrir siempre
     if target_ftp is None:
         client_socket.send(b"421 No available nodes.\r\n")
@@ -90,7 +101,10 @@ def start_proxy_server():
     while True:
         client_socket, addr = proxy_socket.accept()
         client_socket.sendall(b'220 Welcome to the FTP server!\r\n')
-        print('PASO DE SEND') 
+        logger.debug('PASO DE SEND') 
+        # if target_ip is None:
+        #     sd.find()
+        #     target_ftp = sd.target_ip
 
         client_handler = threading.Thread(target=handle_client, args=(client_socket,target_ftp))
         client_handler.start()    
