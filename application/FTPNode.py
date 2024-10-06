@@ -112,6 +112,7 @@ class FTPNode(ChordNode):
         logger.debug(f'HASH DE {new_path} ES {path_hash_name}')
         owner:ChordNodeReference = self.find_succ(path_hash_name)
         successor = owner.succ  # to replicating data
+        predecessor = owner.pred
         file_data: FileData = FileData('drwxr-xr-x',os.path.basename(directory_name),0, datetime.now().strftime('%b %d %H:%M'))
         
         coordinator_ip = self.elector.coordinator
@@ -141,13 +142,13 @@ class FTPNode(ChordNode):
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner.ip, DATABASE_PORT))
         
-        owner_socket.sendall(f'{MKD},{new_path},{current_dir},{file_data},{successor.ip}'.encode('utf-8'))
+        owner_socket.sendall(f'{MKD},{new_path},{current_dir},{file_data},{successor.ip},{predecessor.ip}'.encode('utf-8'))
         response = owner_socket.recv(1024).decode('utf-8').strip()
 
         if response.startswith('220'):
             logger.debug("220")
             owner_socket.close()
-            if self.stor_filedata(current_dir, new_path, file_data, successor.ip, owner.ip):
+            if self.stor_filedata(current_dir, new_path, file_data, owner.ip, successor.ip, predecessor.ip):
                 logger.debug(f'257 "{new_path}" created.\r\n')
                 if client_socket:
                     print("handle_mkd_command -> ENVIA AL CLIENTE")
@@ -236,6 +237,7 @@ class FTPNode(ChordNode):
         directory_hash_name = getShaRepr(absolute_path)
         owner: ChordNodeReference = self.find_succ(directory_hash_name)
         successor = owner.succ
+        predecessor = owner.pred
         
         coordinator_ip = self.elector.coordinator
         if coordinator_ip is None:
@@ -258,7 +260,7 @@ class FTPNode(ChordNode):
         owner_socket.connect((owner.ip, DATABASE_PORT))
         print(owner.ip)
         print(f"_handle_rmd_command: ENVIANDO RMD,{absolute_path},{current_dir} DESDE FTPNODE")
-        owner_socket.sendall(f'{RMD},{absolute_path},{successor.ip}'.encode('utf-8'))
+        owner_socket.sendall(f'{RMD},{absolute_path},{successor.ip},{predecessor.ip}'.encode('utf-8'))
 
         response = owner_socket.recv(1024).decode('utf-8').strip()
         print(f"RMD -> Response: {response}")
@@ -279,7 +281,7 @@ class FTPNode(ChordNode):
             for file in files:
                 self._handle_dele_command(file, os.path.normpath(os.path.dirname(file)))
             print("SALE DEL CICLO DE BORRAR")
-            if self.remove_directory(absolute_path, current_dir, successor.ip, owner.ip):
+            if self.remove_directory(absolute_path, current_dir, owner.ip, successor.ip, predecessor.ip):
                 print(f"handle_rmd_command -> {client_socket} XXX")
                 client_socket.send(f'250 {absolute_path} deleted\r\n'.encode('utf-8'))
                 print(f"handle_rmd_command -> SENT...")
@@ -301,6 +303,8 @@ class FTPNode(ChordNode):
         file_hash_name = getShaRepr(file_name)
         owner: ChordNodeReference = self.find_succ(file_hash_name)
         successor = owner.succ
+        predecessor = owner.pred
+
         try:
             coordinator_ip = self.elector.coordinator
             if coordinator_ip is None:
@@ -321,7 +325,7 @@ class FTPNode(ChordNode):
 
             owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             owner_socket.connect((owner.ip, DATABASE_PORT))
-            owner_socket.sendall(f'{STOR},{file_name},{successor.ip}'.encode('utf-8'))
+            owner_socket.sendall(f'{STOR},{file_name},{successor.ip},{predecessor.ip}'.encode('utf-8'))
 
             response = owner_socket.recv(1024).decode('utf-8').strip()
             if response.startswith('220'):   
@@ -340,7 +344,7 @@ class FTPNode(ChordNode):
 
                 owner_socket.close()
                 file_data = FileData(f"-rw-r--r--", size, datetime.now().strftime('%b %d %H:%M'), {os.path.basename(file_name)})
-                if self.stor_filedata(current_dir, file_path, file_data, successor.ip, owner.ip):
+                if self.stor_filedata(current_dir, file_path, file_data, owner.ip, successor.ip, predecessor.ip):
                     if client_socket:
                         client_socket.send(b"226 Transfer complete.\r\n")
                 else:
@@ -439,15 +443,8 @@ class FTPNode(ChordNode):
                         data_transfer_socket.close()
                         data_transfer_socket = None
             
-            
-
-
-
-
-
-
             else:
-                print("receive_ftp_data: NADA DE NADA FTP")
+                print("FTPNode.py -> Command not found!")
 
         
         except ConnectionAbortedError:
@@ -456,21 +453,19 @@ class FTPNode(ChordNode):
             print("Connection reset by peer")
         finally:
             pass
-            # if data_transfer_socket:
-                # data_transfer_socket.close()
-            # conn.close()
+            if data_transfer_socket:
+                data_transfer_socket.close()
 
     
-
-
     #-----------------AUXILIAR METHODS REGION-----------------#
     # hice este metodo porque cuando voy a hacer el STOR se cosas del FileData despues de que llamé al metodo STOR en el DataNode
-    def stor_filedata(self, current_dir, file_path, filedata: FileData, successor_ip, owner_ip):
+    def stor_filedata(self, current_dir, file_path, filedata: FileData, owner_ip, successor_ip, predecessor_ip):
             print('stor_filedata')
-        # try:
+
             owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             owner_socket.connect((owner_ip, DATABASE_PORT))
-            owner_socket.send(f'{STOR_FILEDATA},{current_dir},{file_path},{filedata},{successor_ip}'.encode('utf-8'))
+
+            owner_socket.send(f'{STOR_FILEDATA},{current_dir},{file_path},{filedata},{successor_ip},{predecessor_ip}'.encode('utf-8'))
 
             response = owner_socket.recv(1024).decode('utf-8').strip()
             print(f'stor_filedata: RESPONSE: {response}')
@@ -485,77 +480,18 @@ class FTPNode(ChordNode):
 
                 return False
             
-        # except Exception as e:
-        #     print(f"stor_filedata: {e}")
-        #     pass
+      
 
 
-
-    def remove_directory(self, absolute_path, current_dir, successor_ip, owner_ip):
+    def remove_directory(self, absolute_path, current_dir, owner_ip, successor_ip, predecessor_ip):
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner_ip, DATABASE_PORT))
-        owner_socket.send(f'{REMOVE_DIR},{absolute_path},{current_dir},{successor_ip}'.encode('utf-8'))
 
-        response = owner_socket.recv(1024).decode('utf-8').strip()   # aqui debo en algun momento controlar que el dir no este disponible
+        owner_socket.send(f'{REMOVE_DIR},{absolute_path},{current_dir},{successor_ip},{predecessor_ip}'.encode('utf-8'))
+
+        response = owner_socket.recv(1024).decode('utf-8').strip()   
         if response.startswith('220'):
             owner_socket.close()
             return True
         else: return False
-
-
-
-
-
-
-
-
-    #-----------------TEST METHODS REGION-----------------#
-    # implementar el CWD
-    # def _test(self):
-    #     time.sleep(20)
-    #     print("ENTRA A _TEST!!!!")
-    #     if self.ip == '172.17.0.2':
-    #         print("Almacenando directorio...")
-    #         self.ref.mkd("dir1")
-    #         print(f"SALIO DE MKD1")
-    #         time.sleep(3)
-    #         self.ref.mkd("dir2")
-    #         print(f"SALIO DE MKD2")
-    #         time.sleep(10)
-    #         # r = self.ref.mkd("dir1/dir3").split(',')
-    #         self.ref.rmd("dir2")
-    #         print(f"SALIO DE RMD")
-    #         # time.sleep(10)
-    #         # print("VA PARA EL MKD DIR3")
-    #         time.sleep(5)
-    #         self.ref.mkd("dir3")
-    #         print(f"SALIO DE MKD3")
-    #         time.sleep(2)
-            # self.ref.list()
-            # print('SALIO DEL LIST')
-            
-
-            # print(f"RESPONSE DE RMD: {r}")
-            # r = self.ref.stor("perro.jpg").split(',')
-
-            # r = self.ref.store_directory("dir2").split(',')
-            # print(f'ESTO ES LA SEGUNDA RESPONSE MILOCO: {r}')
-
-            # r = self.ref.add_file("dir2","dir2_file1")
-            # print(f'ESTO ES EL RESPONSE DE ADD FILE MILOCO: {r}')
-        
-            # time.sleep(10)
-            # print("Otras operaciones...")
-            # r = self.ref.delete_directory("dir2").split(',')
-            # print(f"ESTO ES EL RESPONSE DE DELETE DIRECTORY MILOCO: {r}")
-
-
-        # else:
-        #     print("ENTRA SIENDO OTRO IP")
-
-
-
-            
-
-    
 

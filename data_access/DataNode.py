@@ -82,7 +82,7 @@ class DataNode:
         else:
             client_socket.send(f"404 Not Found".encode('utf-8'))
 
-    def handle_mkd_command(self, completed_path: str, current_dir, file_data: FileData, client_socket: socket.socket, successor_ip = None):
+    def handle_mkd_command(self, completed_path: str, current_dir, file_data: FileData, client_socket: socket.socket, successor_ip = None, predecessor_ip = None):
         is_replication = successor_ip is None
         try:
             if not is_replication:
@@ -95,7 +95,8 @@ class DataNode:
             if not is_replication:
                 client_socket.sendall(f'220'.encode())
                 operation = f'{REPLICATE_MKD}'
-                send_w_ack(operation, f'{completed_path},{current_dir},{file_data}', successor_ip, self.db_port)
+                send_replication_message(operation, f'{completed_path},{current_dir},{file_data}', self.db_port, successor_ip, predecessor_ip)
+
             else:
                 # mandar algún mensaje, controlar las respuestas mejor.
                 pass
@@ -108,9 +109,8 @@ class DataNode:
             print(f"handle_mkd_command: {e}")
             client_socket.send(f"403 Already exists".encode())
 
-    def handle_stor_command(self, file_name: str, successor_ip:str, client_socket: socket.socket):
+    def handle_stor_command(self, file_name: str, client_socket: socket.socket, successor_ip:str, predecessor_ip: str):
         try:
-            # la ruta la estoy poniendo mal
             path = os.path.normpath(ROOT+'/'+ self.ip + '/'  + 'DATA' + '/' + file_name)
             # os.makedirs(path, exist_ok=True)
 
@@ -124,18 +124,17 @@ class DataNode:
                         print(f'handle_stor_command: DATA -> {data}')
                         if not data:
                             break
-                        # a esto le falta la replicacion pero no es tan dificil porque voy a copiar archivos.
                         file.write(data)
 
             operation = f'{REPLICATE_STOR}'
-            send_w_ack(operation, path, successor_ip, self.db_port)
+            send_replication_message(operation, path, self.db_port, successor_ip, predecessor_ip)
 
         except Exception as e:
             print(f"Error: {e}")
 
         pass
 
-    def handle_stor_filedata(self, current_directory, file_path, file_data, client_socket: socket.socket = None, successor_ip:str=None):
+    def handle_stor_filedata(self, current_directory, file_path, file_data, client_socket: socket.socket = None, successor_ip:str=None, predecessor_ip = None):
         is_replication = successor_ip is None
         data = self.data if not is_replication else self.replicated_data
 
@@ -165,13 +164,13 @@ class DataNode:
         if not is_replication:
                 print(f'SUCCESSOR IP: {successor_ip}')
                 operation = f'{REPLICATE_STORFILEDATA}'
-                send_w_ack(operation, f'{current_directory},{file_path},{file_data}', successor_ip, self.db_port)
+                send_replication_message(operation, f'{current_directory},{file_path},{file_data}', self.db_port, successor_ip, predecessor_ip)
                 client_socket.send('220'.encode())
 
         self.save_data(is_replication)
         return True
 
-    def handle_remove_directory(self, absolute_path, current_dir, successor_ip: str, client_socket: socket.socket):
+    def handle_remove_directory(self, absolute_path, current_dir, client_socket: socket.socket, successor_ip: str = None, predecessor_ip = None):
         is_replication = successor_ip is None
         if not is_replication:
             if current_dir in self.data:
@@ -184,7 +183,8 @@ class DataNode:
                     print(f"AFTER REMOVE -> {self.data}")
                     operation = f'{REPLICATE_REMOVE_DIR}'
                     print("LLAMANDO PARA REPLICAR ELIMINACION DE DIRECTORIO...")
-                    send_w_ack(operation, f'{absolute_path},{current_dir}', successor_ip, self.db_port)
+                    
+                    send_replication_message(operation, f'{absolute_path},{current_dir}', self.db_port, successor_ip, predecessor_ip)
 
                 client_socket.sendall(f'220'.encode())
             else:
@@ -219,8 +219,7 @@ class DataNode:
         else:
             client_socket.sendall(b'550 File not found\r\n')
 
-    def handle_rmd_command(self, route, successor_ip: str, client_socket: socket.socket):
-        # route is the absolute path: current_dir/dir_to_remove
+    def handle_rmd_command(self, route, client_socket: socket.socket):
         if route in self.data:
             dirs = self.data[route]
 
@@ -288,12 +287,14 @@ class DataNode:
             current_dir = msg[2]
             file_data = msg[3]
             successor_ip = msg[4]
-            self.handle_mkd_command(route, current_dir, file_data, conn, successor_ip)
+            predecessor_ip = msg[5]
+            self.handle_mkd_command(route, current_dir, file_data, conn, successor_ip, predecessor_ip)
         
         elif operation == STOR:
             route = msg[1]
             successor_ip = msg[2]
-            self.handle_stor_command(route, successor_ip, conn)
+            predecessor_ip = msg[3]
+            self.handle_stor_command(route, conn, successor_ip, predecessor_ip)
 
         elif operation == STOR_FILEDATA:
             print("STOR_FILEDATA")
@@ -301,24 +302,26 @@ class DataNode:
             file_path = msg[2]
             file_data = msg[3]
             successor_ip = msg[4]
-            self.handle_stor_filedata(current_dir, file_path, file_data, conn, successor_ip)
+            predecessor_ip = msg[5]
+            self.handle_stor_filedata(current_dir, file_path, file_data, conn, successor_ip, predecessor_ip)
 
         elif operation == RMD:
             print("RMD_COMMAND")
             route = msg[1]
             successor_ip = msg[2]
-            self.handle_rmd_command(route, successor_ip, conn)
+            self.handle_rmd_command(route, conn)  # really sends the directories and files
 
         elif operation == RETR:
             print('RETR_COMMAND')
             file_name = msg[1]
-            self.handle_retr_command(file_name,conn)
+            self.handle_retr_command(file_name, conn)
         
         elif operation == REMOVE_DIR:
             path = msg[1]
             current_dir = msg[2]
             successor_ip = msg[3]
-            self.handle_remove_directory(path, current_dir, successor_ip, conn)
+            predecessor_ip = msg[4]
+            self.handle_remove_directory(path, current_dir, conn, successor_ip, predecessor_ip)
 
         # replication section
         elif operation == REPLICATE_MKD:
@@ -337,7 +340,7 @@ class DataNode:
             current_directory = data[0]
             file_path = data[1]
             file_data = data[2]
-            self.handle_stor_filedata(current_directory,file_path,file_data)
+            self.handle_stor_filedata(current_directory, file_path, file_data)
             conn.sendall(f'{OK}'.encode())
 
         elif operation == REPLICATE_STOR:
@@ -353,7 +356,7 @@ class DataNode:
             data = conn.recv(1024).decode().split(',')
             abs_path = data[0]
             current_dir = data[1]
-            self.handle_remove_directory(abs_path,current_dir, None, conn)
+            self.handle_remove_directory(abs_path,current_dir, conn)
             print("REMOVIO CON REPLICATE_REMOVE_DIR")
             conn.sendall(f'{OK}'.encode())
 

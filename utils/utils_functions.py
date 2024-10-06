@@ -43,6 +43,14 @@ def send_w_ack(first_msg: str, second_msg: str, target_ip: str, target_port: int
         else:
             print("ACK POSITIVO PARA EL SEGUNDO MENSAJE")
 
+
+def send_replication_message(operation, args, port, successor_ip, predecessor_ip = None):
+    send_w_ack(operation, args, successor_ip, port)
+    
+    if predecessor_ip != successor_ip:
+        send_w_ack(operation, args, predecessor_ip, port)
+
+
 def secure_send(msg:str, target_ip: str, target_port: str, tries):
      if tries == 0:
          return False
