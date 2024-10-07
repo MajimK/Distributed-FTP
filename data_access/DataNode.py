@@ -346,7 +346,7 @@ class DataNode:
         elif operation == REPLICATE_STOR:
             conn.sendall(f'{OK}'.encode())
             data = conn.recv(1024).decode().split(',')
-            file_path = data[1]
+            file_path = data[0]
             self.handle_replicate_stor(file_path)
             conn.sendall(OK.encode())
 

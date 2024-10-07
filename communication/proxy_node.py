@@ -49,7 +49,7 @@ def handle_client(client_socket: socket.socket, target_ftp):
                 if operation in commands:
                     ftp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     ftp_socket.connect((target_ftp, FTP_PORT))
-                    ftp_socket.settimeout(10)
+                    ftp_socket.settimeout(20)
                     ftp_socket.sendall(command.encode('utf-8'))
                     try:
                         while True:

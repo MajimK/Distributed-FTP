@@ -21,11 +21,11 @@ class Coordinator():
             with self.token_owner_lock:
                 with self.processes_lock:
                     print(f'EN LA COLA ESTáN -> {self.processes}')
-                    if self.token_owner is None:
-                        if self.processes:
-                            self.token_owner = self.processes.pop(0)
-                            self.token_owner.send(GRANT.encode('utf-8'))   # creo que lo que pasa es aqui
-            time.sleep(5)
+                    if self.token_owner is None and self.processes:
+                        self.token_owner = self.processes.pop(0)
+                        self.token_owner.send(GRANT.encode('utf-8'))   # creo que lo que pasa es aqui
+                        print("GRANT sent from _see_queue...")
+            time.sleep(1)
 
 
     
@@ -69,6 +69,7 @@ class Coordinator():
                 print("handle: ENTRO A ESTE RELEASE")
                 with self.token_owner_lock:
                     self.token_owner = None
+                    print(f'handle: TOKEN_OWNER: {self.token_owner}')
                     client_socket.send(f'{OK}'.encode('utf-8'))
                     print("handle: HIZO NONE A TOKEN_OWNER...")
 
@@ -79,9 +80,3 @@ class Coordinator():
         pass
 
 
-
-    def enqueue(self, process):
-        pass
-
-    def re(self):  # poner el sinonimo de soltar, que no me acuerdo cual es.
-        pass
