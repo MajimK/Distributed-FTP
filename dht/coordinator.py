@@ -20,7 +20,7 @@ class Coordinator():
         while True:
             with self.token_owner_lock:
                 with self.processes_lock:
-                    print(f'EN LA COLA ESTáN -> {self.processes}')
+                    # print(f'EN LA COLA ESTáN -> {self.processes}')
                     if self.token_owner is None and self.processes:
                         self.token_owner = self.processes.pop(0)
                         self.token_owner.send(GRANT.encode('utf-8'))   # creo que lo que pasa es aqui

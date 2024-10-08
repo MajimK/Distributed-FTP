@@ -6,7 +6,7 @@ from typing import Dict, List
 from utils.operations import OK
 
 logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+                    format='%(threadName)s - %(filename)s - %(funcName)s - %(message)s')
 
 logger = logging.getLogger(__name__)
 

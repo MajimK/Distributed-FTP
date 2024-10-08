@@ -85,6 +85,7 @@ def start_proxy_server():
     # global target_ip
     proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     proxy_socket.bind((PROXY_IP, PROXY_PORT))
+    print(f'PROXY IP IS {PROXY_IP}')
     proxy_socket.listen(5)
     logger.debug(f"Proxy FTP listening on {PROXY_IP}:{PROXY_PORT}")
 
