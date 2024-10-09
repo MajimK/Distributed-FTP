@@ -1,11 +1,10 @@
 import socket
-from application.FTPNode import FTPNode
-
+from dht.chord import ChordNode
 if __name__ == "__main__":
     # Get current IP
     ip = socket.gethostbyname(socket.gethostname())
 
-    node = FTPNode(ip)
+    node = ChordNode(ip)
     print(f"[IP]: {ip}")
 
     node.join()

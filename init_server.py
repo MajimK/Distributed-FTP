@@ -1,3 +1,5 @@
-from communication.proxy_node import call_proxy
+import socket
+from application.FTPNode import FTPNode
 
-call_proxy()
+ip = socket.gethostbyname(socket.gethostname())
+FTPNode(ip)

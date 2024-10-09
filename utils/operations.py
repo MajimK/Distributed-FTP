@@ -26,6 +26,7 @@ ENTRY_POINT = 16
 #---------FTP---------#
 AUTH_SSL = 'AUTH SSL'
 AUTH_TLS = 'AUTH TLS'
+AUTH = 'AUTH'
 CWD = 'CWD'
 DELE = 'DELE'
 FEAT = 'FEAT'
@@ -70,3 +71,10 @@ REQUEST = "REQUEST"
 GRANT = "GRANT"
 OK = 'OK'
 #---------COORDINATOR---------#
+
+
+
+#---------SEARCH---------#
+FIND_COORDINATOR = 'COORD'
+FIND_OWNER = 'OWNER'
+#---------SEARCH---------#

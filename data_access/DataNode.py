@@ -68,7 +68,7 @@ class DataNode:
         logger.debug(f'handle_list_DATA_NODE -> CURRENT_DIR: {current_dir}')
         
         self.load_jsons()
-        
+        # '/app/database/Manage/vitals.txt': '-rw-r--r-- 1 0 0 Oct 09 04:18 vitals.txt 208'
         if current_dir in self.data:
             dirs = self.data[current_dir]
             logger.debug(f'handle_list_command -> DIRS: {dirs}')

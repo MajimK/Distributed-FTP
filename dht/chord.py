@@ -7,6 +7,7 @@ from dht.election import BroadcastElectorNode
 from utils.operations import *
 from utils.consts import *
 from data_access.StaticDataNode import StaticDataNode
+from data_access.DataNode import DataNode
 from dht.coordinator import Coordinator
 
 class ChordNode:
@@ -23,6 +24,7 @@ class ChordNode:
         self.next = 0  # Finger table index to fix next
         self.elector: BroadcastElectorNode = BroadcastElectorNode(self.id)
         self.static_data_node: StaticDataNode = StaticDataNode(self.ip)
+        self.data_node: DataNode = DataNode(self.ip)
         self._start_threads()
 
 
@@ -248,13 +250,41 @@ class ChordNode:
         
         while True:
             data, addr = s.recvfrom(1024)
+            
+            data = data.decode().split(',')
+            logger.debug(f'data is {data}')
+
+            operation_str = data[0]
+            logger.debug(f'operation_str is {operation_str}')
+            if not_self_discover(operation_str):
+                response = ''
+                if operation_str == FIND_COORDINATOR:
+                    response = self.elector.coordinator
+
+                    
+                elif operation_str == FIND_OWNER:
+                    hash = int(data[1])
+                    owner = self.find_succ(hash)
+                    succ = owner.succ
+                    pred = owner.pred
+                    response = f'{owner.ip},{succ.ip},{pred.ip}'
+                    logger.debug(f'response after FIND_OWNER is {response}')
+
+                ip,port = addr
+                try:
+                    print(f'Response to find is {response}')
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                        logger.debug(f'Sender ip: {ip} -- Sender port: {port}')
+                        sock.sendto(response.encode('utf-8'), (ip, port))
+                except BrokenPipeError:
+                    logger.debug(f'The message was sent! (not by {self.ip})')
+                continue
 
             if addr[0] == self.ip:
                 print("start_broadcast_server: EL MENSAJE ES DE EL MISMO")
                 continue
             else:
                 print(f"start_broadcast_server: MENSAJE RECIBIDO DESDE: {addr[0]}")
-                data = data.decode().split(',')
                 operation = int(data[0])
                 
                 if operation == DISCOVER:

@@ -65,11 +65,31 @@ def secure_send(msg:str, target_ip: str, target_port: str, tries):
         else: return True
 
         
-        
+# def find_coordinator() -> str:
+#     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+#         s.sendto(FIND.encode(),('<broadcast>', BROADCAST_PORT))
+
+#         coordinator_ip = s.recv(1024).decode().strip()
+
+#         return coordinator_ip
+
+def find(message) -> str:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    s.sendto(message.encode(),('<broadcast>', BROADCAST_PORT))
+
+    response = s.recv(1024).decode('utf-8').strip()
+    s.close()
+    logger.debug(f'response to ftp is {response}')
+    return response
+
 
 def bully(ip1, ip2):
     return int(ip1.split('.')[-1]) > int(ip2.split('.')[-1])
 
+def not_self_discover(message):
+    return message == FIND_COORDINATOR or message == FIND_OWNER
 
 def inbetween(k: int, start: int, end: int) -> bool:
         """Checks if k is in the interval (start, end].
