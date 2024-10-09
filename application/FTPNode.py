@@ -419,16 +419,18 @@ class FTPNode:
     def start_ftp_server(self):
         logger.debug("Start server!")
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind((self.ip, self.ftp_port))
-            s.listen(10)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((self.ip, self.ftp_port))
+        s.listen(10)
 
-            while True:
-                conn, addr = s.accept()
-                logger.debug(f'WELCOME <-(: x-x-x :)-> {addr}')
-                conn.sendall(b'220 Welcome to the FTP server!\r\n')
-                threading.Thread(target=self.receive_ftp_data, args=(conn,)).start()
+        while True:
+            conn, addr = s.accept()
+            logger.debug(f'WELCOME <-(: x-x-x :)-> {addr}')
+            conn.sendall(b'220 Welcome to the FTP server!\r\n')
+            threading.Thread(target=self.receive_ftp_data, args=(conn,)).start()
+            
+        
 
     def receive_ftp_data(self, conn: socket.socket):
         with FTPNode.current_dir_lock:

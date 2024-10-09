@@ -125,7 +125,6 @@ class ChordNode:
             self.succ = self.ref
             self.pred = None
             self.elector.coordinator = self.ip
-            self.elector.coordinator_instance = Coordinator(self.ip)
 
 
 
@@ -222,10 +221,7 @@ class ChordNode:
             time.sleep(10)
 
 
-            # except Exception as e:
-            #     logger.debug(f"[XXX] check_predecessor: ENTRA A LA EXCEPCION: {e}\n")
-            #     self.pred = None
-
+           
 
 
     def start_server(self):
