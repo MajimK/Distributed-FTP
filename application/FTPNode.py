@@ -113,8 +113,6 @@ class FTPNode:
         logger.debug(f'LIST -> owner_socket response: {response}')
         if response.startswith('220'):
             owner_socket.send('220'.encode('utf-8'))   # esto sobra creo
-            # secure_send(b'150 Here comes the directory listing\r\n', client_ip, client_port, 3)
-            # client_socket = reset_socket(client_socket)
             client_socket.sendall(b'150 Here comes the directory listing.\r\n')
             data = ""
             logger.debug("LIST LLEGA HASTA AQUI")
@@ -399,7 +397,7 @@ class FTPNode:
                     logger.debug(f'size -> {size}')
 
                 owner_socket.close()
-                file_data = FileData(f"-rw-r--r--", size, datetime.now().strftime('%b %d %H:%M'), os.path.basename(file_name))
+                file_data = FileData(permissions_and_type = f"-rw-r--r--", size = size, last_modification_date = datetime.now().strftime('%b %d %H:%M'), name = file_name)
                 if self.stor_filedata(current_dir, file_path, file_data, owner_ip, successor_ip, predecessor_ip):
                     if client_socket:
                         client_socket.send(b"226 Transfer complete.\r\n")
@@ -556,7 +554,6 @@ class FTPNode:
             owner_socket.connect((owner_ip, DATABASE_PORT))
 
             owner_socket.send(f'{STOR_FILEDATA},{current_dir},{file_path},{filedata},{successor_ip},{predecessor_ip}'.encode('utf-8'))
-
             response = owner_socket.recv(1024).decode('utf-8').strip()
             logger.debug(f'stor_filedata: RESPONSE: {response}')
             if response.startswith('220'):
