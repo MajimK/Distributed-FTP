@@ -19,6 +19,7 @@ class ChordNode:
         self.ref = ChordNodeReference(self.ip, self.port)
         self.succ: ChordNodeReference = self.ref  # Initial successor is itself
         self.pred: ChordNodeReference = None  # Initially no predecessor
+        self.predspred: ChordNodeReference = None
         self.m = m  # Number of bits in the hash/key space
         self.finger = [self.ref] * self.m  # Finger table
         self.next = 0  # Finger table index to fix next
@@ -118,12 +119,14 @@ class ChordNode:
             self.succ.notify(self.ref)
             
             if self.succ.succ.id == self.succ.id:
-                self.succ.first_notify(self.ref)
                 self.pred = self.succ
+                self.predspred = self.ref
+                self.succ.first_notify(self.ref)
         else:
             self.static_data_node.create_its_folder(True)
             self.succ = self.ref
             self.pred = None
+            self.predspred = None
             self.elector.coordinator = self.ip
 
 
@@ -156,7 +159,15 @@ class ChordNode:
                             
                                 self.succ = succ_predecessor
                         self.succ.notify(self.ref)     
-                              
+                    else:
+                        logger.debug('Stable network')
+
+                    if self.pred and self.pred.check_node():
+                        self.predspred = self.pred.pred
+
+                else:
+                    logger.debug('Successor lost...')
+
             logger.debug(f"[=X=] succ : {self.succ} pred {self.pred}\n")
             time.sleep(10)
 
@@ -173,9 +184,11 @@ class ChordNode:
         else:
             if self.pred is None:
                 self.pred = node
+                self.predspred = node.pred
 
             elif node.check_node():
                 if self._inbetween(node.id, self.pred.id, self.id):
+                    self.predspred = self.pred
                     pred_ip = self.pred.ip
                     self.pred  = node
                     new_node_ip = node.ip
@@ -199,6 +212,7 @@ class ChordNode:
         """
         self.succ = node
         self.pred = node
+        self.predspred = self.ref
         self.static_data_node.migrate_data_one_node(node.ip, self.elector.coordinator)
 
     def fix_fingers(self):
@@ -206,20 +220,32 @@ class ChordNode:
 
     def check_predecessor(self):
         while True:
-            # try:
-            if self.pred and not self.pred.check_node():
+            try:
+                if self.pred and not self.pred.check_node():
 
-                logger.debug("check_predecessor: PREDECESOR PERDIDO\n")
-                self.pred = self.find_pred(self.pred.id)
-                self.pred.notify_pred(self.ref)
-                if self.pred.id == self.id:
-                    self.pred = None
+                    logger.debug("PREDECESOR PERDIDO\n")
+                    if self.predspred.check_node():  # predspred exist
+                        self.pred = self.predspred
+                        self.predspred = self.predspred.pred
+                        
+                    else:
+                        self.pred = self.find_pred(self.predspred.id)
+                        self.predspred = self.pred.pred
+                        
+                    self.pred.notify_pred(self.ref)
 
-                pred_ip = self.pred.ip if self.pred is not None else self.ip
-                self.static_data_node.migrate_data_cause_fall(pred_ip, self.succ.ip, self.elector.coordinator)
+                    if self.pred.id == self.id:
+                        self.pred = None
+                        self.predspred = None
+
+                    pred_ip = self.pred.ip if self.pred is not None else self.ip
+                    self.static_data_node.migrate_data_cause_fall(pred_ip, self.succ.ip, self.elector.coordinator)
+
+            except Exception:
+                self.pred = None
+                self.succ = self.ref
 
             time.sleep(10)
-
 
            
 
