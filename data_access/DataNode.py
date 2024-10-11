@@ -87,9 +87,10 @@ class DataNode:
                         except Exception as e:
                             logger.debug(f"handle_list_command: {e}")
                     
-                    #no me queda claro que es asi como quiero acceder a los recursos->analizar
-
-                    client_socket.sendall('\n'.join(result).encode('utf-8'))   
+                    response = '\n'.join(result)
+                    if response == '':
+                        response = END
+                    client_socket.sendall(response.encode('utf-8'))   
 
             except Exception as e:
                 logger.debug(f"handle_list_command: {e}")
@@ -241,21 +242,25 @@ class DataNode:
 
     
     def handle_retr_command(self, file_name :str, client_socket: socket.socket):
-        path = os.path.normpath("app/database/"+ self.ip + '/DATA/'+ file_name )
-        if os.path.isfile(path):
-            client_socket.send(b'225')
-            with open(path, 'rb') as file:
-                response = client_socket.recv(1024).decode().strip()
-                if response.startswith('230'):
-                    while True:
-                        data = file.read(1024)
-                        if not data:
-                            break
-                        client_socket.sendall(data)
-            client_socket.sendall(b'226 Transfer complete\r\n')
+        abs_path = os.path.normpath(ROOT +'/'+ self.ip + '/DATA/'+ file_name )
+        logger.debug(f'path: {abs_path} and is file: {os.path.isfile(abs_path)}')
+        # logger.debug(os.path.curdir)
+        # if os.path.isfile(os.path.basename(abs_path)):
+        client_socket.send(b'225')
+        with open(abs_path, 'rb') as file:
+            data = b''
+            response = client_socket.recv(1024).decode().strip()
+            if response.startswith('230'):
+                while True:
+                    data = file.read(1024)
+                    logger.debug(f'Data from file {data}')
+                    if not data:
+                        break
+                    client_socket.sendall(data)
+        client_socket.sendall(b'226 Transfer complete\r\n')
 
-        else:
-            client_socket.sendall(b'550 File not found\r\n')
+        # else:
+        #     client_socket.sendall(b'550 File not found\r\n')
 
     def handle_rmd_command(self, route, client_socket: socket.socket):
         if route in self.data:

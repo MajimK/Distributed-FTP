@@ -105,7 +105,7 @@ def inbetween(k: int, start: int, end: int) -> bool:
         if start < end:
             return start < k <= end
         else:  # The interval wraps around 0
-            return start < k or k <= end
+            return (k > start and k >= end) or (k <= start and k < end)
         
 def reset_socket(s: socket.socket, target_ip, target_port) -> socket.socket:
     s.close()

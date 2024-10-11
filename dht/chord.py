@@ -231,7 +231,7 @@ class ChordNode:
                     else:
                         self.pred = self.find_pred(self.predspred.id)
                         self.predspred = self.pred.pred
-                        
+
                     self.pred.notify_pred(self.ref)
 
                     if self.pred.id == self.id:

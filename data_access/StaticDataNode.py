@@ -165,31 +165,45 @@ class StaticDataNode:
 
             # 1
             self.remove_duplicates(succ_node_replicated_path,path)
+            print('PASE DE 1')
 
         
             # clean new node folder before copying
             self.clean_folder(new_node_path) 
 
             # 2
-            self.copy_folder_with_condition(path, new_node_path, new_node.id, pred_data_node.ip)
+            self.copy_folder_with_condition(path, new_node_path, new_node.id, pred_data_node.id)
+            print('PASE DE 2')
+
             # clean new node replicated data folder before copying
             self.clean_folder(new_node_replicated_path)
 
             # 3
             self.copy_files(path, new_node_replicated_path)
+            print('PASE DE 3')
+
             # 4
             self.copy_files(pred_node_path, new_node_replicated_path)
+            print('PASE DE 4')
 
             # 5
             self.remove_duplicates(new_node_replicated_path,succ_node_path,replicated_path)
+            print('PASE DE 5')
+
             # 6
             self.remove_duplicates(pred_node_replicated_path,new_node_replicated_path)
+            print('PASE DE 6')
+
             # 7
             self.copy_files(path,succ_node_replicated_path)
+            print('PASE DE 7')
+
 
             # 8
             self.copy_files(new_node_path,replicated_path)
             self.copy_files(new_node_path,pred_node_replicated_path)
+            print('PASE DE 8')
+
 
             print(f'NEW NODE DATA: {new_node.data}')
             print(f'NEW NODE REPLICATED DATA: {new_node.replicated_data}')
@@ -369,7 +383,8 @@ class StaticDataNode:
     def copy_folder_with_condition(self, source_path, dest_path, dest_id, pred_id):
         for file in os.listdir(source_path):
             file_path = os.path.normpath(source_path + '/' + file)
-            file_hash_path = getShaRepr(file_path)
+            file_to_hash = str(file).replace('-','/')
+            file_hash_path = getShaRepr(file_to_hash)
 
             if inbetween(file_hash_path, pred_id, dest_id): 
                 new_path = os.path.normpath(dest_path + '/' + file)
@@ -380,7 +395,8 @@ class StaticDataNode:
         
         for file in os.listdir(source_path):
             file_path = os.path.normpath(source_path + '/' + file)
-            file_hash_path = getShaRepr(file_path)
+            file_to_hash = str(file).replace('-','/')
+            file_hash_path = getShaRepr(file_to_hash)
 
             if inbetween(file_hash_path, pred_id, dest_id): 
                 new_path = os.path.normpath(dest_path + '/' + file)
@@ -410,7 +426,10 @@ class StaticDataNode:
         replicated_data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
         os.makedirs(replicated_data_path, exist_ok=True)
         print(f'REP_DATA DE {self.ip}: {replicated_data_path}')
-
+        
+        self.clean_folder(data_path)
+        self.clean_folder(replicated_data_path)
+        
         if is_first:
             self.data[ROOT] = {}
             self.replicated_data[ROOT] = {}
@@ -437,7 +456,8 @@ class StaticDataNode:
             files_origin = os.listdir(path_to_verify)
             for file in os.listdir(path_to_del):
                 if file in files_origin:
-                    os.remove(file)
+                    print(f'FILE IS {file}')
+                    os.remove(path_to_del+'/'+file)
 
 
     

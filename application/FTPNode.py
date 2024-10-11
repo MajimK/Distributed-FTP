@@ -83,8 +83,8 @@ class FTPNode:
         find_response = find(FIND_OWNER+','+str(current_dir_hash)).split(',')
         logger.debug(f'find_response1 is {find_response}')
         owner_ip = find_response[0]
-        successor_ip = find_response[1]
-        predecessor_ip = find_response[2]
+        # successor_ip = find_response[1]
+        # predecessor_ip = find_response[2]
         
         find_response = find(FIND_COORDINATOR)
         logger.debug(f'find_response2 is {find_response}')
@@ -112,19 +112,20 @@ class FTPNode:
 
         logger.debug(f'LIST -> owner_socket response: {response}')
         if response.startswith('220'):
-            owner_socket.send('220'.encode('utf-8'))   # esto sobra creo
             client_socket.sendall(b'150 Here comes the directory listing.\r\n')
+            owner_socket.sendall('220'.encode('utf-8'))   # esto sobra creo
             data = ""
             logger.debug("LIST LLEGA HASTA AQUI")
-            owner_socket.settimeout(5)
+            owner_socket.settimeout(10)
             while True: 
                 try:
                     chunk = owner_socket.recv(4096).decode('utf-8')
                     logger.debug(f"CHUNK: {chunk}")
-                    data+= chunk
-                    if chunk == "":
+                    if chunk == END:
                         break
+                    data+= chunk
                 except TimeoutError:  # controlar mejor esto
+                    logger.error('TimeoutError')
                     break
             logger.debug("LIST -> SALE DEL WHILE TRUE")
             FTPNode.data_transfer_socket.sendall(data.encode('utf-8'))
@@ -156,7 +157,8 @@ class FTPNode:
         """
         new_path = os.path.normpath(os.path.join(current_dir, directory_name))  # no contemplo si la ruta es absoluta
         path_hash_name = getShaRepr(new_path)
-        logger.debug(f'HASH DE {new_path} ES {path_hash_name}')
+        logger.debug(f'{new_path} hash is: {path_hash_name}')
+
         
         find_response = find(FIND_OWNER+','+str(path_hash_name)).split(',')
         owner_ip = find_response[0]
@@ -268,12 +270,15 @@ class FTPNode:
 
             response = owner_socket.recv(1024).decode().strip()
             if response.startswith('225'):
+
+                client_socket.send(b"150 Opening binary mode data connection for file transfer.\r\n")
                 owner_socket.send(b'230')
                 while True:
-                    data = owner_socket.recv(1024)
-                    if data.startswith('226'):
+                    data = owner_socket.recv(4096)
+                    print(f'Retrieved data: {data}')
+                    if data.decode().startswith('226'):
                         break
-                    FTPNode.data_transfer_socket.send(data)
+                    FTPNode.data_transfer_socket.sendall(data)
             client_socket.sendall(f'226 Transfer complete\r\n'.encode())
         except Exception as e:
             logger.debug(f'ERROR: {e}')
@@ -353,7 +358,8 @@ class FTPNode:
 
     def _handle_stor_command(self, file_name: str, client_socket: socket.socket, current_dir):
         file_path = os.path.join(current_dir,file_name)
-        file_hash_name = getShaRepr(file_name)
+        file_hash_name = getShaRepr(file_path)
+        logger.debug(f'{file_path} hash is: {file_hash_name}')
         # obtain owner ip and coordinator ip
         find_response = find(FIND_OWNER+','+str(file_hash_name)).split(',')
         owner_ip = find_response[0]
@@ -379,7 +385,8 @@ class FTPNode:
 
             owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             owner_socket.connect((owner_ip, DATABASE_PORT))
-            owner_socket.sendall(f'{STOR},{file_name},{successor_ip},{predecessor_ip}'.encode('utf-8'))
+            path_to_send = file_path.replace('/','-')
+            owner_socket.sendall(f'{STOR},{path_to_send},{successor_ip},{predecessor_ip}'.encode('utf-8'))
 
             response = owner_socket.recv(1024).decode('utf-8').strip()
             if response.startswith('220'):   
