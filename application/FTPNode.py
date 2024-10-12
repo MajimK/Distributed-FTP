@@ -36,9 +36,6 @@ class FTPNode:
         successor_ip = find_response[1]
         predecessor_ip = find_response[2]
 
-        # owner = self.find_succ(path_hash)
-        # successor = owner.succ
-        # predecessor = owner.pred
 
         find_response = find(FIND_COORDINATOR)
         coordinator_ip = find_response
@@ -63,15 +60,35 @@ class FTPNode:
 
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner_ip, DATABASE_PORT))
-        
-        owner_socket.sendall(f'{DELE},{file_name},{current_dir},{successor_ip},{predecessor_ip}'.encode('utf-8'))
+        name_to_find = str(current_dir+'/'+file_name).replace('/','-')
+        owner_socket.sendall(f'{DELE},{name_to_find},{current_dir},{successor_ip},{predecessor_ip}'.encode('utf-8'))
         response = owner_socket.recv(1024).decode('utf-8').strip()
-
+        logger.debug(f"response: {response}")
         if response.startswith('220'):
             # manage the success
             owner_socket.close()
+            current_dir_hash = getShaRepr(current_dir)
+            find_response = find(f'{FIND_OWNER},{current_dir_hash}').split(',')
+            owner_ip = find_response[0]
+            successor_ip = find_response[1]
+            predecessor_ip = find_response[2]
 
+            if self.remove_filedata(file_name,current_dir,owner_ip, successor_ip, predecessor_ip):
+                logger.debug('remove_filedata True')
+                if client_socket:
+                    client_socket.send(b"250 File deleted successfully.\r\n")
+            elif client_socket:
+                logger.debug('remove_filedata False')
+                client_socket.send(b"451 Requested action aborted: local error in processing.\r\n")
 
+        else:
+            client_socket.send(b"550 File not found.\r\n")
+
+        is_sent = secure_send(RELEASE, coordinator_ip, COORDINATOR_PORT, 5)
+        if is_sent:
+            logger.debug("DELE -> RELEASE SENT...")
+        else:
+            logger.debug("DELE -> RELEASE SENT FAILED")
         
         pass
 
@@ -200,6 +217,13 @@ class FTPNode:
         if response.startswith('220'):
             logger.debug("220")
             owner_socket.close()
+
+            path_hash_name = getShaRepr(current_dir)
+            find_response = find(FIND_OWNER+','+str(path_hash_name)).split(',')
+            owner_ip = find_response[0]
+            successor_ip = find_response[1]
+            predecessor_ip = find_response[2]
+
             if self.stor_filedata(current_dir, new_path, file_data, owner_ip, successor_ip, predecessor_ip):
                 logger.debug(f'257 "{new_path}" created.\r\n')
                 if client_socket:
@@ -257,8 +281,9 @@ class FTPNode:
         return data_socket
 
     def _handle_retr_command(self,current_dir,client_socket:socket.socket,file_name):
-        file_hash_name = getShaRepr(file_name)
-        
+        abs_path = current_dir+'/'+file_name
+        file_hash_name = getShaRepr(abs_path)
+        name_to_find = str(abs_path).replace('/','-')
 
         find_response = find(FIND_OWNER+','+str(file_hash_name)).split(',')
         owner_ip = find_response[0]
@@ -266,7 +291,7 @@ class FTPNode:
         try:
             owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             owner_socket.connect((owner_ip, DATABASE_PORT))
-            owner_socket.sendall(f'{RETR},{file_name}'.encode())
+            owner_socket.sendall(f'{RETR},{name_to_find}'.encode())
 
             response = owner_socket.recv(1024).decode().strip()
             if response.startswith('225'):
@@ -339,10 +364,17 @@ class FTPNode:
             for file in files:
                 self._handle_dele_command(file, os.path.normpath(os.path.dirname(file)))
             logger.debug("SALE DEL CICLO DE BORRAR")
+            current_dir_hash = getShaRepr(current_dir)
+            find_response = find(f'{FIND_OWNER},{current_dir_hash}')
+            owner_ip = find_response[0]
+            successor_ip = find_response[1]
+            predecessor_ip = find_response[2]
             if self.remove_directory(absolute_path, current_dir, owner_ip, successor_ip, predecessor_ip):
                 logger.debug(f"handle_rmd_command -> {client_socket} XXX")
                 client_socket.send(f'250 {absolute_path} deleted\r\n'.encode('utf-8'))
                 logger.debug(f"handle_rmd_command -> SENT...")
+            else:
+                client_socket.send(b"451 Requested action aborted: local error in processing.\r\n")
             logger.debug("SALE DEL REMOVE DIRECTORY")
         else:
             if client_socket:
@@ -405,6 +437,12 @@ class FTPNode:
 
                 owner_socket.close()
                 file_data = FileData(permissions_and_type = f"-rw-r--r--", size = size, last_modification_date = datetime.now().strftime('%b %d %H:%M'), name = file_name)
+                current_dir_hash = getShaRepr(current_dir)
+                find_response = find(f'{FIND_OWNER},{current_dir_hash}').split(',')
+                owner_ip = find_response[0]
+                successor_ip = find_response[1]
+                predecessor_ip = find_response[2]
+
                 if self.stor_filedata(current_dir, file_path, file_data, owner_ip, successor_ip, predecessor_ip):
                     if client_socket:
                         client_socket.send(b"226 Transfer complete.\r\n")
@@ -557,13 +595,20 @@ class FTPNode:
     #-----------------AUXILIAR METHODS REGION-----------------#
     # hice este metodo porque cuando voy a hacer el STOR se cosas del FileData despues de que llamé al metodo STOR en el DataNode
     def stor_filedata(self, current_dir, file_path, filedata: FileData, owner_ip, successor_ip, predecessor_ip):
-            logger.debug('stor_filedata')
+            logger.debug('start stor_filedata')
+            logger.debug(f'owner_ip -> {owner_ip}')
+            logger.debug(f'successor_ip -> {successor_ip}')
+            logger.debug(f'predecessor_ip -> {owner_ip}')
 
             owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             owner_socket.connect((owner_ip, DATABASE_PORT))
 
             owner_socket.send(f'{STOR_FILEDATA},{current_dir},{file_path},{filedata},{successor_ip},{predecessor_ip}'.encode('utf-8'))
-            response = owner_socket.recv(1024).decode('utf-8').strip()
+            owner_socket.settimeout(8)
+            try:
+                response = owner_socket.recv(1024).decode('utf-8').strip()
+            except TimeoutError:
+                logger.debug('Timeout Error!!!')
             logger.debug(f'stor_filedata: RESPONSE: {response}')
             if response.startswith('220'):
                 logger.debug(f'stor_filedata: 220')
@@ -589,6 +634,7 @@ class FTPNode:
         else: return False
 
     def remove_filedata(self, file_name, current_dir, owner_ip, successor_ip, predecessor_ip):
+        logger.debug('start remove_filedata')
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner_ip, DATABASE_PORT))
 

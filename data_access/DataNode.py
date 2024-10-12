@@ -47,21 +47,26 @@ class DataNode:
 
     def handle_dele_command(self, file_name, current_dir, client_socket: socket.socket, successor_ip = None, predecessor_ip = None):
         is_replication = successor_ip is None
-        
-        path = os.path.normpath(ROOT+'/'+ self.ip + '/'  + 'DATA' + '/' + file_name) if is_replication else os.path.normpath(ROOT+'/'+ self.ip + '/'  + 'REPLICATED_DATA' + '/' + file_name)
+
+        path = os.path.normpath(ROOT+'/'+ self.ip + '/'  + 'DATA' + '/' + file_name) if not is_replication else os.path.normpath(ROOT+'/'+ self.ip + '/'  + 'REPLICATED_DATA' + '/' + file_name)
+        logger.debug(f'path -> {path}')
         try:
             if os.path.isfile(path):
                 os.remove(path)
-                client_socket.send('220'.encode('utf-8'))
 
                 if not is_replication:
-                    operation = REPLICATE_DELEFILEDATA
+                    client_socket.send('220'.encode('utf-8'))
+                    logger.debug('Replicating dele...')
+                    operation = f'{REPLICATE_DELE}'
                     send_replication_message(operation, f'{file_name},{current_dir}', self.db_port, successor_ip, predecessor_ip)
-
+                    logger.debug('replication dele message sent...')
             else:
-                client_socket.send('404'.encode('utf-8'))
+                if not is_replication:
+                    client_socket.send('404'.encode('utf-8'))
         except Exception as e:
-            client_socket.send(f'Error in handle_dele_command: {e}'.encode('utf-8'))                
+            logger.debug(f'error {e}')
+            if not is_replication:
+                client_socket.send(f'Error in handle_dele_command: {e}'.encode('utf-8'))                
 
     def handle_list_command(self, current_dir, client_socket:socket.socket):
 
@@ -151,40 +156,40 @@ class DataNode:
         pass
 
     def handle_stor_filedata(self, current_directory, file_path, file_data, client_socket: socket.socket = None, successor_ip:str=None, predecessor_ip = None):
+        logger.debug('start stor_filedata (DN)')
         is_replication = successor_ip is None
+        self.load_jsons()
         data = self.data if not is_replication else self.replicated_data
 
         if current_directory in data:
             logger.debug(f'_asign_filedata: EL DIRECTORIO {current_directory} EXISTE')
             dir = self.data[current_directory] if not is_replication else self.replicated_data[current_directory]
             dir[file_path] = file_data
-        
-        elif current_directory == ROOT: #it's first time
-            logger.debug(f'_asign_filedata: EL DIRECTORIO {current_directory} NO EXISTE PERO ES ROOT')
-            
             if not is_replication:
-                self.data[current_directory] = {}
-                dirs = self.data[current_directory]
-                dirs[file_path] = file_data
+                client_socket.send('220'.encode())
             
-            else: 
-                logger.debug(f"ESTA REPLICANDO... entra con {current_directory} para replicar {file_path}")
-                self.replicated_data[current_directory] = {}
+            # if not is_replication:
+            #     self.data[current_directory] = {}
+            #     dirs = self.data[current_directory]
+            #     dirs[file_path] = file_data
+            #     client_socket.send('220'.encode())
+            
+            # else: 
+            #     logger.debug(f"ESTA REPLICANDO... entra con {current_directory} para replicar {file_path}")
+            #     self.replicated_data[current_directory] = {}
 
-                dirs = self.replicated_data[current_directory]
-                dirs[file_path] = file_data
+            #     dirs = self.replicated_data[current_directory]
+            #     dirs[file_path] = file_data
 
 
         else:
-            return False
+            if not is_replication:
+                client_socket.send('404'.encode())
         if not is_replication:
                 logger.debug(f'SUCCESSOR IP: {successor_ip}')
                 operation = f'{REPLICATE_STORFILEDATA}'
                 send_replication_message(operation, f'{current_directory},{file_path},{file_data}', self.db_port, successor_ip, predecessor_ip)
-                client_socket.send('220'.encode())
-
         self.save_data(is_replication)
-        return True
 
     def handle_remove_directory(self, absolute_path, current_dir, client_socket: socket.socket, successor_ip: str = None, predecessor_ip = None):
         is_replication = successor_ip is None
@@ -216,17 +221,25 @@ class DataNode:
 
         self.save_data(is_replication) 
 
-    def handle_remove_file(self, absolute_path, current_dir, client_socket, successor_ip = None, predecessor_ip = None):
+    def handle_remove_file(self, file_name, current_dir, client_socket, successor_ip = None, predecessor_ip = None):
         is_replication = successor_ip is None
+        # self.load_jsons()
+        absolute_path = current_dir+'/'+file_name
+        logger.debug(f'data: {self.data}')
+        logger.debug(f'absolute_path: {absolute_path}')
+        logger.debug(f'current_dir: {current_dir}')
+
+        
         if not is_replication:
             if current_dir in self.data:
                 dirs = self.data[current_dir]
                 if absolute_path in dirs:
                     dirs.pop(absolute_path)
                     self.data[current_dir] = dirs  # buscar si se guardan como llave
+                    logger.debug(f'self.data[current_dir] = {self.data[current_dir]}')
                     operation = f'{REPLICATE_DELEFILEDATA}'
                     
-                    send_replication_message(operation, f'{absolute_path},{current_dir}', self.db_port, successor_ip, predecessor_ip)
+                    send_replication_message(operation, f'{file_name},{current_dir}', self.db_port, successor_ip, predecessor_ip)
 
                 client_socket.sendall(f'220'.encode('utf-8'))
             else:
@@ -234,10 +247,12 @@ class DataNode:
         else:
             if current_dir in self.replicated_data:
                 dirs = self.replicated_data[current_dir]
+                logger.debug(f'Dirs before removing is {dirs}')
                 if absolute_path in dirs:
+                    logger.debug('absolute path is in dirs')
                     dirs.pop(absolute_path)
-                self.replicated_data[current_dir] = dirs
-
+                    self.replicated_data[current_dir] = dirs
+            logger.debug(f'Replicated after removing is {self.replicated_data}')
         self.save_data(is_replication) 
 
     
@@ -325,8 +340,18 @@ class DataNode:
             current_dir = msg[2]
             successor_ip = msg[3]
             predecessor_ip = msg[4]
+            logger.debug(f'successor_ip -> {successor_ip}')
+            logger.debug(f'predecessor_ip -> {predecessor_ip}')
+
             self.handle_dele_command(file_name, current_dir, conn, successor_ip, predecessor_ip)
 
+        elif operation == DELE_FILEDATA:
+            file_name = msg[1]
+            current_dir = msg[2]
+            successor_ip = msg[3]
+            predecessor_ip = msg[4]
+            # abs_path = current_dir+'/'+file_name
+            self.handle_remove_file(file_name,current_dir, conn, successor_ip, predecessor_ip)
 
         elif operation == LIST:
             current_dir = msg[1]
@@ -374,6 +399,16 @@ class DataNode:
             self.handle_remove_directory(path, current_dir, conn, successor_ip, predecessor_ip)
 
         # replication section
+        elif operation == REPLICATE_DELE:
+            logger.debug('REPLICATE_DELE')
+            conn.sendall(f'{OK}'.encode())
+            data = conn.recv(1024).decode().split(',')
+            logger.debug(data)
+            file_name = data[0]
+            current_dir = data[1]
+            self.handle_dele_command(file_name,current_dir,conn)
+            conn.sendall(f'{OK}'.encode())
+
         elif operation == REPLICATE_DELEFILEDATA:
             logger.debug('REPLICATE_DELEFILEDATA')
             conn.sendall(f'{OK}'.encode())
