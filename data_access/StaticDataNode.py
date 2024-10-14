@@ -292,7 +292,7 @@ class StaticDataNode:
         succ_data_node = StaticDataNode(succ_node_ip)
         succ_data_node.load_data()
         self.load_data()
-
+        # coger como dato los datos replicados del predecesor (algo asi)
         # transfer directories from replicated data: 1
         keys_to_transfer = [k for k in self.replicated_data.keys()]
         for key in keys_to_transfer:
@@ -301,11 +301,17 @@ class StaticDataNode:
             self.data[key] = self.replicated_data[key]
             del self.replicated_data[key]
 
-        # delete my data from pred an succ
+        # delete my data from pred and take the data of my old predpred 
         keys_to_transfer = [k for k in pred_data_node.replicated_data.keys()]
         for key in keys_to_transfer:
             if key in self.data:
                 del pred_data_node.replicated_data[key]
+            elif inbetween(getShaRepr(key), getShaRepr(pred_node_ip), getShaRepr(self.ip)):
+                self.data[key] = keys_to_transfer[key]
+                del pred_data_node.replicated_data[key]
+            else:
+                continue
+
 
         keys_to_transfer = [k for k in succ_data_node.replicated_data.keys()]
         for key in keys_to_transfer:

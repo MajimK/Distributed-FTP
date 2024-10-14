@@ -7,4 +7,4 @@ def getShaRepr(data: str):
 
 
 
-print(getShaRepr('perro23999.txt'))
+print(getShaRepr('/app/database/314'))

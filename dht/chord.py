@@ -26,6 +26,7 @@ class ChordNode:
         self.elector: BroadcastElectorNode = BroadcastElectorNode(self.id)
         self.static_data_node: StaticDataNode = StaticDataNode(self.ip)
         self.data_node: DataNode = DataNode(self.ip)
+        self.migration_lock = threading.Lock()
         self._start_threads()
 
 
@@ -109,6 +110,7 @@ class ChordNode:
         Args:
             node (ChordNodeReference): The node
         """
+        # como puedo controlar esto aqui?
         if node is not None:
             logger.debug("join: EL NODO VIENE ESPECIFICADO!")
             self.pred = None
@@ -119,6 +121,7 @@ class ChordNode:
             self.succ.notify(self.ref)
             
             if self.succ.succ.id == self.succ.id:
+                logger.debug('There was one node...')
                 self.pred = self.succ
                 self.predspred = self.ref
                 self.succ.first_notify(self.ref)
@@ -194,7 +197,8 @@ class ChordNode:
                     new_node_ip = node.ip
                     succ_ip = self.succ.ip
                     print(f'SELF.IP -> {self.ip} SELF.PRED.IP -> {self.pred.ip} SELF.SUCC.IP -> {self.succ.ip}')
-                    self.static_data_node.migrate_data_to_new_node(new_node_ip, pred_ip, succ_ip, self.elector.coordinator)
+                    with self.migration_lock:
+                        self.static_data_node.migrate_data_to_new_node(new_node_ip, pred_ip, succ_ip, self.elector.coordinator)
        
         
 
@@ -213,7 +217,8 @@ class ChordNode:
         self.succ = node
         self.pred = node
         self.predspred = self.ref
-        self.static_data_node.migrate_data_one_node(node.ip, self.elector.coordinator)
+        with self.migration_lock:
+            self.static_data_node.migrate_data_one_node(node.ip, self.elector.coordinator)
 
     def fix_fingers(self):
         pass
@@ -223,14 +228,17 @@ class ChordNode:
             try:
                 if self.pred and not self.pred.check_node():
 
-                    logger.debug("PREDECESOR PERDIDO\n")
+                    logger.debug("Lost predecessor!!!! \n")
                     if self.predspred.check_node():  # predspred exist
                         self.pred = self.predspred
                         self.predspred = self.predspred.pred
+                        # aqui puedo replicar normal, pero fijarse que ya estoy cambiando el ip de pred.
                         
                     else:
+                        logger.debug('Predpred is also lost')
                         self.pred = self.find_pred(self.predspred.id)
                         self.predspred = self.pred.pred
+                        # analizar casos aqui, porque si no tengo pred_pred hay que replicar de otra forma.
 
                     self.pred.notify_pred(self.ref)
 
@@ -239,13 +247,14 @@ class ChordNode:
                         self.predspred = None
 
                     pred_ip = self.pred.ip if self.pred is not None else self.ip
-                    self.static_data_node.migrate_data_cause_fall(pred_ip, self.succ.ip, self.elector.coordinator)
+                    with self.migration_lock:
+                        self.static_data_node.migrate_data_cause_fall(pred_ip, self.succ.ip, self.elector.coordinator)
 
             except Exception:
                 self.pred = None
                 self.succ = self.ref
 
-            time.sleep(10)
+            time.sleep(15)
 
            
 

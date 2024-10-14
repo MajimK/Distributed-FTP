@@ -581,7 +581,8 @@ class FTPNode:
                 else:
                     logger.debug("Command not found!")
                     conn.send(b'500 Syntax error, command unrecognized.\r\n')
-
+        except BrokenPipeError:
+            logger.debug("Connection is closed after commands not found")
         except ConnectionAbortedError:
             logger.debug("Connection aborted by peer")
         except ConnectionResetError:
