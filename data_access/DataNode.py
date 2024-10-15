@@ -28,7 +28,7 @@ class DataNode:
 
 
         threading.Thread(target=self._recv, daemon=True).start()
-        threading.Thread(target=self._prints, daemon=True).start()
+        # threading.Thread(target=self._prints, daemon=True).start()
 
     
 
@@ -40,7 +40,7 @@ class DataNode:
         file_path = os.path.join(root_dir, file_name)
         data = self.data if not is_replication else self.replicated_data
 
-        logger.debug(f"SAVE_DATA -> {self.data} AND IS_REPLICATION: {is_replication} AND DATA: {data}")
+        # logger.debug(f"SAVE_DATA -> {self.data} AND IS_REPLICATION: {is_replication} AND DATA: {data}")
 
         with open(file_path, 'w') as f:
             json.dump(data, f)
@@ -56,11 +56,13 @@ class DataNode:
 
                 if not is_replication:
                     client_socket.send('220'.encode('utf-8'))
-                    logger.debug('Replicating dele...')
+                    logger.debug('✉️ Enviando mensaje para replicar...')
                     operation = f'{REPLICATE_DELE}'
                     send_replication_message(operation, f'{file_name},{current_dir}', self.db_port, successor_ip, predecessor_ip)
-                    logger.debug('replication dele message sent...')
+                    # logger.debug('replication dele message sent...')
             else:
+                logger.debug('👯 Replicando DELE...')
+
                 if not is_replication:
                     client_socket.send('404'.encode('utf-8'))
         except Exception as e:
@@ -70,19 +72,19 @@ class DataNode:
 
     def handle_list_command(self, current_dir, client_socket:socket.socket):
 
-        logger.debug(f'handle_list_DATA_NODE -> CURRENT_DIR: {current_dir}')
+        # logger.debug(f'handle_list_DATA_NODE -> CURRENT_DIR: {current_dir}')
         
         with self.jsons_lock:
             self.load_jsons()
         # '/app/database/Manage/vitals.txt': '-rw-r--r-- 1 0 0 Oct 09 04:18 vitals.txt 208'
         if current_dir in self.data:
             dirs = self.data[current_dir]
-            logger.debug(f'handle_list_command -> DIRS: {dirs}')
+            # logger.debug(f'handle_list_command -> DIRS: {dirs}')
 
             try:
                 client_socket.send(f'220'.encode())
                 response = client_socket.recv(1024).decode()
-                logger.debug(f"handle_list_command -> RESPONSE: {response}")
+                # logger.debug(f"handle_list_command -> RESPONSE: {response}")
 
                 if response.startswith('220'):
                     result = []
@@ -94,7 +96,7 @@ class DataNode:
                             logger.debug(f"handle_list_command: {e}")
                     
                     response = '\n'.join(result)
-                    logger.debug(f'Data_Node response: {response}')
+                    # logger.debug(f'Data_Node response: {response}')
                     if response == '':
                         response = END
                     client_socket.sendall(response.encode('utf-8'))   
@@ -114,15 +116,17 @@ class DataNode:
                 self.data[completed_path] = {}
                 with self.jsons_lock:
                     self.save_data(is_replication)
-                logger.debug(f'SELF.DATA -> {self.data}')
+                # logger.debug(f'SELF.DATA -> {self.data}')
             else:
-                logger.debug("REPLICA MKD")
+                logger.debug("✉️ Enviado mensaje para replicar...")
                 self.replicated_data[completed_path] = {}
-                logger.debug(f'replicated data after replicate: {self.replicated_data}')
+                # logger.debug(f'replicated data after replicate: {self.replicated_data}')
                 with self.jsons_lock:
                     self.save_data(is_replication)
                 
             if not is_replication:
+                logger.debug("👯 Replicando MKD...")
+
                 client_socket.sendall(f'220'.encode())
                 operation = f'{REPLICATE_MKD}'
                 send_replication_message(operation, f'{completed_path},{current_dir},{file_data}', self.db_port, successor_ip, predecessor_ip)
@@ -147,7 +151,7 @@ class DataNode:
                     
                     while True:
                         data = client_socket.recv(1024)
-                        logger.debug(f'handle_stor_command: DATA -> {data}')
+                        # logger.debug(f'handle_stor_command: DATA -> {data}')
                         if not data:
                             break
                         file.write(data)
@@ -161,14 +165,14 @@ class DataNode:
         pass
 
     def handle_stor_filedata(self, current_directory, file_path, file_data, client_socket: socket.socket = None, successor_ip:str=None, predecessor_ip = None):
-        logger.debug('start stor_filedata (DN)')
+        # logger.debug('start stor _filedata (DN)')
         is_replication = successor_ip is None
         with self.jsons_lock:
             self.load_jsons(is_replication)
         data = self.data if not is_replication else self.replicated_data
-        logger.debug(f'Data is {data} and is_replication is {is_replication}')
+        # logger.debug(f'Data is {data} and is_replication is {is_replication}')
         if current_directory in data:
-            logger.debug(f'_asign_filedata: EL DIRECTORIO {current_directory} EXISTE')
+            # logger.debug(f'_asign_filedata: EL DIRECTORIO {current_directory} EXISTE')
             dir = self.data[current_directory] if not is_replication else self.replicated_data[current_directory]
             dir[file_path] = file_data
             with self.jsons_lock:
@@ -195,7 +199,7 @@ class DataNode:
             if not is_replication:
                 client_socket.send('404'.encode())
         if not is_replication:
-                logger.debug(f'SUCCESSOR IP: {successor_ip}')
+                # logger.debug(f'SUCCESSOR IP: {successor_ip}')
                 operation = f'{REPLICATE_STORFILEDATA}'
                 send_replication_message(operation, f'{current_directory},{file_path},{file_data}', self.db_port, successor_ip, predecessor_ip)
         
@@ -207,12 +211,12 @@ class DataNode:
         if not is_replication:
             if absolute_path in self.data:
                 self.data.pop(absolute_path)
-                logger.debug(f'Dirs after pop is {self.data}')
+                # logger.debug(f'Dirs after pop is {self.data}')
                 # self.data[current_dir] = dirs
                 # self.data.pop(absolute_path)
-                logger.debug(f"AFTER REMOVE -> {self.data}")
+                # logger.debug(f"AFTER REMOVE -> {self.data}")
                 operation = f'{REPLICATE_REMOVE_DIR}'
-                logger.debug("LLAMANDO PARA REPLICAR ELIMINACION DE DIRECTORIO...")
+                logger.debug("✉️ Enviando mensaje para replicar...")
                 client_socket.sendall(f'220'.encode())
                 with self.jsons_lock:   
                     self.save_data(is_replication) 
@@ -222,6 +226,7 @@ class DataNode:
             else:
                 client_socket.sendall(f'404 Not Found'.encode())
         else:
+                logger.debug('👯 Replicando REMOVE_DIR...')
                 if absolute_path in self.replicated_data:
                     self.replicated_data.pop(absolute_path)
                     with self.jsons_lock:   
@@ -234,10 +239,10 @@ class DataNode:
         if file_name.__contains__('/'):
             absolute_path = file_name
         else: absolute_path = current_dir+'/'+file_name
-        logger.debug(f'data: {self.data}')
-        logger.debug(f'replicated_data: {self.replicated_data} and is_replication {is_replication}')
-        logger.debug(f'absolute_path: {absolute_path}')
-        logger.debug(f'current_dir: {current_dir}')
+        # logger.debug(f'data: {self.data}')
+        # logger.debug(f'replicated_data: {self.replicated_data} and is_replication {is_replication}')
+        # logger.debug(f'absolute_path: {absolute_path}')
+        # logger.debug(f'current_dir: {current_dir}')
 
         
         if not is_replication:
@@ -246,7 +251,8 @@ class DataNode:
                 if absolute_path in dirs:
                     dirs.pop(absolute_path)
                     self.data[current_dir] = dirs  
-                    logger.debug(f'self.data[current_dir] = {self.data[current_dir]}')
+                    # logger.debug(f'self.data[current_dir] = {self.data[current_dir]}')
+                    logger.debug('✉️ Enviando mensaje para replicar...')
                     operation = f'{REPLICATE_DELEFILEDATA}'
                     with self.jsons_lock:
                         self.save_data(is_replication) 
@@ -256,21 +262,22 @@ class DataNode:
             else:
                 client_socket.sendall(f'404 Not Found'.encode('utf-8'))
         else:
+            logger.debug('👯 Replicando DELE_FILEDATA...')
             if current_dir in self.replicated_data:
                 dirs = self.replicated_data[current_dir]
-                logger.debug(f'Dirs before removing is {dirs}')
+                # logger.debug(f'Dirs before removing is {dirs}')
                 if absolute_path in dirs:
-                    logger.debug('absolute path is in dirs')
+                    # logger.debug('absolute path is in dirs')
                     dirs.pop(absolute_path)
                     self.replicated_data[current_dir] = dirs
-                    logger.debug(f'Replicated after removing is {self.replicated_data}')
+                    # logger.debug(f'Replicated after removing is {self.replicated_data}')
                     with self.jsons_lock:
                         self.save_data(is_replication) 
 
     
     def handle_retr_command(self, file_name :str, client_socket: socket.socket):
         abs_path = os.path.normpath(ROOT +'/'+ self.ip + '/DATA/'+ file_name )
-        logger.debug(f'path: {abs_path} and is file: {os.path.isfile(abs_path)}')
+        # logger.debug(f'path: {abs_path} and is file: {os.path.isfile(abs_path)}')
         # logger.debug(os.path.curdir)
         # if os.path.isfile(os.path.basename(abs_path)):
         client_socket.send(b'225')
@@ -305,15 +312,16 @@ class DataNode:
                     files.append(subdir)
 
             response = '\n'.join(directories) + '\n' + END + '\n'.join(files)
-            logger.debug(f"handle_rmd_command: LA RESPUESTA QUE SE ENVIARA DESDE EL DATANODE ES {response}")
+            # logger.debug(f"handle_rmd_command: LA RESPUESTA QUE SE ENVIARA DESDE EL DATANODE ES {response}")
             client_socket.sendall(f'220 {response}'.encode())
         
         else:
             client_socket.send(f"404 Not Found".encode())
 
     def handle_replicate_stor(self, file_path: str):
-            new_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA' + '/')
-            shutil.copy2(file_path, new_path)
+        logger.debug('👯 Replicando STOR')
+        new_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA' + '/')
+        shutil.copy2(file_path, new_path)
 
 
     
@@ -339,7 +347,7 @@ class DataNode:
 
     def _data_receive(self, conn:socket.socket, msg:str):
         
-        logger.debug(f"_data_receive: EL MENSAJE QUE ESTA LLEGANDO EN DATA_NODE ES {msg}")
+        logger.debug(f"📫 El mensaje que llega a DataNode es {msg}")
         msg = msg.split(',')
         logger.debug(msg)
         try:
@@ -348,16 +356,18 @@ class DataNode:
             operation = msg[0]
 
         if operation == DELE:
+            logger.debug('❌🗂️ Operación DELE')
             file_name = msg[1]
             current_dir = msg[2]
             successor_ip = msg[3]
             predecessor_ip = msg[4]
-            logger.debug(f'successor_ip -> {successor_ip}')
-            logger.debug(f'predecessor_ip -> {predecessor_ip}')
+            # logger.debug(f'successor_ip -> {successor_ip}')
+            # logger.debug(f'predecessor_ip -> {predecessor_ip}')
 
             self.handle_dele_command(file_name, current_dir, conn, successor_ip, predecessor_ip)
 
         elif operation == DELE_FILEDATA:
+            logger.debug('❌ Operación DELE_FILEDATA')
             file_name = msg[1]
             current_dir = msg[2]
             successor_ip = msg[3]
@@ -366,10 +376,12 @@ class DataNode:
             self.handle_remove_file(file_name,current_dir, conn, successor_ip, predecessor_ip)
 
         elif operation == LIST:
+            logger.debug('🗒️ Operación LIST')
             current_dir = msg[1]
             self.handle_list_command(current_dir, conn)
 
         elif operation == MKD:
+            logger.debug('📁 Operación MKD')
             route = msg[1]
             current_dir = msg[2]
             file_data = msg[3]
@@ -378,13 +390,14 @@ class DataNode:
             self.handle_mkd_command(route, current_dir, file_data, conn, successor_ip, predecessor_ip)
         
         elif operation == STOR:
+            logger.debug('📀 Operación STOR')
             route = msg[1]
             successor_ip = msg[2]
             predecessor_ip = msg[3]
             self.handle_stor_command(route, conn, successor_ip, predecessor_ip)
 
         elif operation == STOR_FILEDATA:
-            logger.debug("STOR_FILEDATA")
+            logger.debug('⬆️ Operación STOR_FILEDATA')
             current_dir = msg[1]
             file_path = msg[2]
             file_data = msg[3]
@@ -393,17 +406,18 @@ class DataNode:
             self.handle_stor_filedata(current_dir, file_path, file_data, conn, successor_ip, predecessor_ip)
 
         elif operation == RMD:
-            logger.debug("RMD_COMMAND")
+            logger.debug('❌📁 Operación RMD')
             route = msg[1]
             successor_ip = msg[2]
             self.handle_rmd_command(route, conn)  # really sends the directories and files
 
         elif operation == RETR:
-            logger.debug('RETR_COMMAND')
+            logger.debug('⬇️ Operación RETR')
             file_name = msg[1]
             self.handle_retr_command(file_name, conn)
         
         elif operation == REMOVE_DIR:
+            logger.debug('❌ Operación REMOVE_DIR')
             path = msg[1]
             current_dir = msg[2]
             successor_ip = msg[3]
@@ -412,7 +426,9 @@ class DataNode:
 
         # replication section
         elif operation == REPLICATE_DELE:
-            logger.debug('REPLICATE_DELE')
+            # logger.debug('REPLICATE_DELE')
+            logger.debug('👯 Replicando DELE...')
+
             conn.sendall(f'{OK}'.encode())
             data = conn.recv(1024).decode().split(',')
             logger.debug(data)
@@ -422,7 +438,9 @@ class DataNode:
             conn.sendall(f'{OK}'.encode())
 
         elif operation == REPLICATE_DELEFILEDATA:
-            logger.debug('REPLICATE_DELEFILEDATA')
+            # logger.debug('REPLICATE_DELEFILEDATA')
+            logger.debug('👯 Replicando DELE_FILEDATA...')
+
             conn.sendall(f'{OK}'.encode())
             data = conn.recv(1024).decode().split(',')
             abs_path = data[0]
@@ -431,26 +449,32 @@ class DataNode:
             conn.sendall(f'{OK}'.encode())
 
         elif operation == REPLICATE_MKD:
+            logger.debug('👯 Replicando MKD...')
+
             conn.sendall(f'{OK}'.encode())
             data = conn.recv(1024).decode().split(',')
             route = data[0]
             current_dir = data[1]
             file_data = data[2]
-            logger.debug("REPLICANDO MKD...")
+            # logger.debug("REPLICANDO MKD...")
             self.handle_mkd_command(route, current_dir, file_data, conn)
             conn.sendall(f'{OK}'.encode())
 
         elif operation == REPLICATE_REMOVE_DIR:
-            logger.debug("REPLICATE_REMOVE_DIR")
+            # logger.debug("REPLICATE_REMOVE_DIR")
+            logger.debug('👯 Replicando REMOVE_DIR...')
+
             conn.sendall(f'{OK}'.encode())
             data = conn.recv(1024).decode().split(',')
             abs_path = data[0]
             current_dir = data[1]
             self.handle_remove_directory(abs_path,current_dir, conn)
-            logger.debug("REMOVIO CON REPLICATE_REMOVE_DIR")
+            # logger.debug("REMOVIO CON REPLICATE_REMOVE_DIR")
             conn.sendall(f'{OK}'.encode())
 
         elif operation == REPLICATE_STOR:
+            logger.debug('👯 Replicando STOR...')
+
             conn.sendall(f'{OK}'.encode())
             data = conn.recv(1024).decode().split(',')
             file_path = data[0]
@@ -458,6 +482,8 @@ class DataNode:
             conn.sendall(OK.encode())
 
         elif operation == REPLICATE_STORFILEDATA:
+            logger.debug('👯 Replicando STOR_FILEDATA...')
+
             conn.sendall(f'{OK}'.encode())
             data = conn.recv(1024).decode().split(',')
             current_directory = data[0]
@@ -468,21 +494,21 @@ class DataNode:
 
 
         else:
-            logger.debug("NADA DE NADA")
+            logger.debug("No es un mensaje conocido por DataNode")
 
 
 #------------------TEST------------------#
-    def _prints(self):
-        while True:
-            time.sleep(10)
-            logger.debug(f"CONTENIDO DE {self.ip}:")
-            for d in self.data.keys():
-                # logger.debug()
-                logger.debug(f"DIRECTORIO: {d}: {self.data[d]}")
+    # def _prints(self):
+    #     while True:
+    #         time.sleep(10)
+    #         logger.debug(f"CONTENIDO DE {self.ip}:")
+    #         for d in self.data.keys():
+    #             # logger.debug()
+    #             logger.debug(f"DIRECTORIO: {d}: {self.data[d]}")
             
-            for rd in self.replicated_data.keys():
-                logger.debug(f'DIRECTORIO REPLICADO: {rd}: {self.replicated_data[rd]}')
-            logger.debug("\n\n")
+    #         for rd in self.replicated_data.keys():
+    #             logger.debug(f'DIRECTORIO REPLICADO: {rd}: {self.replicated_data[rd]}')
+    #         logger.debug("\n\n")
 
 
 
@@ -497,7 +523,7 @@ class DataNode:
             try:
                 with open(data_file, 'r') as f:
                     self.data = json.load(f)
-                    logger.debug(f"LOAD_JSON -> DATA: {self.data}")
+                    # logger.debug(f"LOAD_JSON -> DATA: {self.data}")
             except Exception as e:
                 logger.debug(f"LOAD_JSON -> {e} -> data_file: {data_file}")
 
@@ -505,7 +531,7 @@ class DataNode:
             try:
                 with open(replicated_data_file, 'r') as f:
                     self.replicated_data = json.load(f)
-                    logger.debug(f'LOAD_JSON -> REPLICATED: {self.replicated_data}')
+                    # logger.debug(f'LOAD_JSON -> REPLICATED: {self.replicated_data}')
             except Exception as e:
                 logger.debug(f"LOAD_JSON -> {e} -> rep_file: {replicated_data_file}")
 

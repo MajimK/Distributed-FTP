@@ -26,25 +26,25 @@ class ChordNodeReference:
         """
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                print(f'sending {op}')
+                # print(f'sending {op}')
                 s.connect((self.ip, DEFAULT_PORT))
                 s.sendall(f'{op},{data}'.encode('utf-8'))
                 response = s.recv(1024)
-                if op == MKD:
-                    print("_send_data: RESPONSE CHORD_NODE_REFERENCE: ", response)
+                # if op == MKD:
+                #     print("_send_data: RESPONSE CHORD_NODE_REFERENCE: ", response)
                 return response
         except Exception as e:
-            print(f"Error sending data: {e}")
+            # print(f"Error sending data: {e}")
             return b''
         
     def _send_data_ftp(self, op: int, data: str = None):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                print(f'sending {op}')
+                # print(f'sending {op}')
                 s.connect((self.ip, FTP_PORT))
                 s.sendall(f'{op},{data}'.encode('utf-8'))                
         except Exception as e:
-            print(f"Error sending data: {e}")
+            # print(f"Error sending data: {e}")
             return b''
         
 
@@ -84,13 +84,13 @@ class ChordNodeReference:
     @property
     def pred(self) -> 'ChordNodeReference':
         response = self._send_data(GET_PREDECESSOR).decode().split(',')
-        print(f'!!!!!!RESPONSE: {response}')
+        # print(f'!!!!!!RESPONSE: {response}')
         ip =response[1]
         return ChordNodeReference(ip, self.port)
 
     def get_coordinator(self) -> str:
         coordinator = self._send_data(GET_COORDINATOR).decode().split(',')
-        print("get_coordinator: COORDINATOR ES: ", coordinator)
+        # print("get_coordinator: COORDINATOR ES: ", coordinator)
         coord_ip = coordinator[1]
         return coord_ip
     
@@ -146,7 +146,7 @@ class ChordNodeReference:
 
     ###------- FTP -------###
     def mkd(self, route:str):
-        logger.debug(f'CHORD_NODE_REFERENCE: MKD {route}')
+        # logger.debug(f'CHORD_NODE_REFERENCE: MKD {route}')
         self._send_data_ftp(f'{MKD} ' f'{route}')
     
     def stor(self, file_name:str):

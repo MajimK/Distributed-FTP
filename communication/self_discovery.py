@@ -1,7 +1,7 @@
 from utils.consts import *
 import threading
 import socket
-from utils.utils_functions import send_by_broadcast
+from utils.utils_functions import send_by_broadcast, logger
 from utils.operations import DISCOVER, ENTRY_POINT
 import time
 
@@ -21,13 +21,13 @@ class SelfDiscovery:
             str: Returns the target ip
         """
         send_by_broadcast(f'{DISCOVER},{self.ip},{self.port}')
-        print(f'find: MENSAJE ENVIADO POR BROADCAST')
+        logger.debug(f'🔎 Buscando nodo al que conectarse')
         while not self.target_ip:
             # print(f'find: WAITING...')
 
             time.sleep(0.25)
 
-        print("find: TIENE UN IP AL QUE CONECTARSE")
+        print("🕵🏻 Nodo econtrado")
         return self.target_ip
     
 
@@ -36,12 +36,12 @@ class SelfDiscovery:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((self.ip, self.port))
             s.listen(5)
-            print(f"_recv: ESPERANDO RESPUESTA POR {self.ip}:{self.port}")
+            # print(f"_recv: ESPERANDO RESPUESTA POR {self.ip}:{self.port}")
 
             while True:
                 conn, addr = s.accept()
 
-                print(f'_rev: MENSAJE DE {addr[0]}')
+                # print(f'_rev: MENSAJE DE {addr[0]}')
 
                 if addr[0] == self.ip:
                     continue
@@ -50,7 +50,7 @@ class SelfDiscovery:
                 option = int(data[0])
 
                 if option == ENTRY_POINT:
-                    print(f"_recv: {self.ip} RECIBIO RESPUESTA DE {data[1]}")
+                    # print(f"_recv: {self.ip} RECIBIO RESPUESTA DE {data[1]}")
                     self.target_ip = data[1]
                     conn.close()
                     s.close()

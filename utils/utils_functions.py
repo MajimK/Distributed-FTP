@@ -6,7 +6,7 @@ from typing import Dict, List
 from utils.operations import OK
 
 logging.basicConfig(level=logging.DEBUG,
-                    format='%(threadName)s - %(filename)s - %(funcName)s - %(message)s')
+                    format='%(filename)s - %(funcName)s - %(message)s')
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def send_w_ack(first_msg: str, second_msg: str, target_ip: str, target_port: int
         if ack != f"{OK}":
             raise Exception("ACK NEGATIVO")
         else:
-            print("ACK POSITIVO PARA EL PRIMER MENSAJE")
+            print("✅1️⃣ ACK Positivo")
         s.sendall(second_msg.encode('utf-8'))
         
         ack = s.recv(1024).decode('utf-8')
@@ -41,7 +41,7 @@ def send_w_ack(first_msg: str, second_msg: str, target_ip: str, target_port: int
         if ack != f"{OK}":
             raise Exception(f"ACK NEGATIVO: {ack}")
         else:
-            print("ACK POSITIVO PARA EL SEGUNDO MENSAJE")
+            print("✅2️⃣ ACK POSITIVO PARA EL SEGUNDO MENSAJE")
 
 
 def send_replication_message(operation, args, port, successor_ip, predecessor_ip = None):

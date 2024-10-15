@@ -25,7 +25,7 @@ class StaticDataNode:
         replicated_empty = False
         x = os.path.exists(replicated_data_file)
         print(replicated_data_file)
-        print(f"load_data: REP_DATA_FILE -> {x}")
+        # print(f"load_data: REP_DATA_FILE -> {x}")
 
         # if not os.path.exists(replicated_data_file) or not os.path.exists(data_file):
         #     self.create_its_folder()
@@ -33,18 +33,18 @@ class StaticDataNode:
 
         if os.stat(replicated_data_file).st_size == 0:
             replicated_empty = True
-            print(f"REPLICATED DATA FOR {self.ip} IS EMPTY.")
+            # print(f"REPLICATED DATA FOR {self.ip} IS EMPTY.")
             self.replicated_data = {}
         if os.stat(data_file).st_size == 0:
             data_empty = True
-            print(f"DATA FOR {self.ip} IS EMPTY.")
+            # print(f"DATA FOR {self.ip} IS EMPTY.")
             self.data = {}
            
         try:
             if not data_empty:
                 with open(data_file, 'r') as f:
                     self.data = json.load(f)
-                    print(f"LOAD_JSON -> DATA: {self.data}")
+                    # print(f"LOAD_JSON -> DATA: {self.data}")
         except Exception as e:
             print(f"LOAD_JSON -> {e} -> data_file: {data_file}")
 
@@ -52,27 +52,27 @@ class StaticDataNode:
             if not replicated_empty:
                 with open(replicated_data_file, 'r') as f:
                     self.replicated_data = json.load(f)
-                    print(f'LOAD_JSON -> REPLICATED: {self.replicated_data}')
+                    # print(f'LOAD_JSON -> REPLICATED: {self.replicated_data}')
         except Exception as e:
             print(f"LOAD_JSON -> {e} -> rep_file: {replicated_data_file}")
         pass
     
     def save_data(self, is_replication: bool):
         """Save this instance to a JSON file."""
-        print(f'!!!!!!Para {self.ip} datos son -> {self.data} \n Replicados son -> {self.replicated_data}')
+        # print(f'!!!!!!Para {self.ip} datos son -> {self.data} \n Replicados son -> {self.replicated_data}')
         file_name = 'data.json' if not is_replication else 'replicated_data.json'
         root_dir = os.path.join(ROOT, self.ip)
         file_path = os.path.join(root_dir, file_name)
         data = self.data if not is_replication else self.replicated_data
 
-        print(f"SAVE_DATA -> {self.data} AND IS_REPLICATION: {is_replication} AND DATA: {data}")
-        print(f"save_data: JSON CREADO EN {file_path}")
+        # print(f"SAVE_DATA -> {self.data} AND IS_REPLICATION: {is_replication} AND DATA: {data}")
+        # print(f"save_data: JSON CREADO EN {file_path}")
         with open(file_path, 'w') as f:
             json.dump(data, f)
 
         with open(file_path, 'r') as f:
             x = json.load(f)
-        print(f"save_data: INFO DEL JSON: {x}")
+        # print(f"save_data: INFO DEL JSON: {x}")
     
     
     def send_message(self, message:str, operation:str, coordinator_ip)->bool:
@@ -88,17 +88,17 @@ class StaticDataNode:
         if self.send_message(REQUEST, 'new_node',coordinator_ip):
             self.load_data()
             # print("MIGRATE_DATA_TO_NEW_NODE: " + {self.ip})
-            print(f'ESTOS SON LOS IP PREDECESOR{pred_node_ip} Y SUCESOR{succ_node_ip}' )
+            # print(f'ESTOS SON LOS IP PREDECESOR{pred_node_ip} Y SUCESOR{succ_node_ip}' )
             new_node = StaticDataNode(new_node_ip)
             new_node.load_data()
             succ_data_node = StaticDataNode(succ_node_ip)
             succ_data_node.load_data()
             pred_data_node = StaticDataNode(pred_node_ip)
             pred_data_node.load_data()
-            print(f"CUANDO CARGA LOS DATOS SUCC_REP_DATA ES: {succ_data_node.replicated_data}")
+            # print(f"CUANDO CARGA LOS DATOS SUCC_REP_DATA ES: {succ_data_node.replicated_data}")
             
             # remove my data from succ replicated data: 1
-            print('ESTOY EN MIGRATE DATA TO NEW NODE')
+            # print('ESTOY EN MIGRATE DATA TO NEW NODE')
             keys_to_transfer = [k for k in succ_data_node.replicated_data.keys()]
             for key in keys_to_transfer:
                 if key in self.data:
@@ -140,7 +140,7 @@ class StaticDataNode:
             keys_to_transfer = [k for k in self.data.keys()]
             for key in keys_to_transfer:
                 succ_data_node.replicated_data[key] = self.data[key]
-                print(f'SE HACE ESTO Y ESTA ES LA KEY --> {succ_data_node.replicated_data[key]}')
+                # print(f'SE HACE ESTO Y ESTA ES LA KEY --> {succ_data_node.replicated_data[key]}')
 
             # Copy new node data to me and pred: 8
             keys_to_transfer = [k for k in new_node.data.keys()]
@@ -150,7 +150,7 @@ class StaticDataNode:
                 if key not in pred_data_node.replicated_data:
                     pred_data_node.replicated_data[key]= new_node.data[key]
 
-            print('SE SUPONE QUE LLEGUE AQUI')
+            # print('SE SUPONE QUE LLEGUE AQUI')
             
 
             # TRANSFER FILES
@@ -165,7 +165,7 @@ class StaticDataNode:
 
             # 1
             self.remove_duplicates(succ_node_replicated_path,path)
-            print('PASE DE 1')
+            # print('PASE DE 1')
 
         
             # clean new node folder before copying
@@ -173,43 +173,43 @@ class StaticDataNode:
 
             # 2
             self.copy_folder_with_condition(path, new_node_path, new_node.id, pred_data_node.id)
-            print('PASE DE 2')
+            # print('PASE DE 2')
 
             # clean new node replicated data folder before copying
             self.clean_folder(new_node_replicated_path)
 
             # 3
             self.copy_files(path, new_node_replicated_path)
-            print('PASE DE 3')
+            # print('PASE DE 3')
 
             # 4
             self.copy_files(pred_node_path, new_node_replicated_path)
-            print('PASE DE 4')
+            # print('PASE DE 4')
 
             # 5
             self.remove_duplicates(new_node_replicated_path,succ_node_path,replicated_path)
-            print('PASE DE 5')
+            # print('PASE DE 5')
 
             # 6
             self.remove_duplicates(pred_node_replicated_path,new_node_replicated_path)
-            print('PASE DE 6')
+            # print('PASE DE 6')
 
             # 7
             self.copy_files(path,succ_node_replicated_path)
-            print('PASE DE 7')
+            # print('PASE DE 7')
 
 
             # 8
             self.copy_files(new_node_path,replicated_path)
             self.copy_files(new_node_path,pred_node_replicated_path)
-            print('PASE DE 8')
+            # print('PASE DE 8')
 
 
-            print(f'NEW NODE DATA: {new_node.data}')
-            print(f'NEW NODE REPLICATED DATA: {new_node.replicated_data}')
-            print(f'SELF DATA: {self.data}')
-            print(f'SELF REPLICATED DATA: {self.replicated_data}')
-            print(f'SUCC DATA: {succ_data_node.replicated_data}')
+            # print(f'NEW NODE DATA: {new_node.data}')
+            # print(f'NEW NODE REPLICATED DATA: {new_node.replicated_data}')
+            # print(f'SELF DATA: {self.data}')
+            # print(f'SELF REPLICATED DATA: {self.replicated_data}')
+            # print(f'SUCC DATA: {succ_data_node.replicated_data}')
 
             if pred_node_ip == succ_node_ip:
                 keys_to_transfer = [k for k in pred_data_node.replicated_data.keys()]
@@ -224,23 +224,25 @@ class StaticDataNode:
             self.save_data(True)
             response = self.send_message(RELEASE, 'new_node', coordinator_ip)
             if response:
-                print('new_node -> RELEASE SENT...')
+                logger.debug("🤝 Recurso devuelto")
+
             else:
-                print('new_node -> NADA DE RELEASE')
+                logger.debug("🤝 Recurso NO devuelto")
+
         else:
-            print("new_node -> NO SE PUDO REPLICAR!!!")
+            print("❌❌❌ NO SE PUDO REPLICAR!!!")
 
     def migrate_data_one_node(self, new_node_ip: str, coordinator_ip):
-        print('ENTRE EN MIGRATE DATA ONE NODE')
+        # print('ENTRE EN MIGRATE DATA ONE NODE')
         if self.send_message(REQUEST, 'one_node', coordinator_ip):
             self.load_data()
-            logger.debug(f"MIGRATE_DATA_ONE_NODE: {self.data}")
-            logger.debug(f"MIGRATE_DATA_ONE_NODE: {self.replicated_data}")
+            # logger.debug(f"MIGRATE_DATA_ONE_NODE: {self.data}")
+            # logger.debug(f"MIGRATE_DATA_ONE_NODE: {self.replicated_data}")
 
             new_node = StaticDataNode(new_node_ip)
             new_node.load_data()
-            logger.debug(f"MIGRATE_DATA_ONE_NODE: NEW_NODE -> {self.data}")
-            logger.debug(f"MIGRATE_DATA_ONE_NODE: NEW_NODE_REP ->{self.replicated_data}")
+            # logger.debug(f"MIGRATE_DATA_ONE_NODE: NEW_NODE -> {self.data}")
+            # logger.debug(f"MIGRATE_DATA_ONE_NODE: NEW_NODE_REP ->{self.replicated_data}")
 
             keys_to_transfer = [k for k in self.data.keys()]
             for key in keys_to_transfer:
@@ -279,13 +281,14 @@ class StaticDataNode:
             self.save_data(False)
             self.save_data(True)
             if self.send_message(RELEASE, 'one_node', coordinator_ip):
-                print('RELEASE SENT...')
-            else:
-                print('NADA DE RELEASE')
-        else:
-            print('one_node -> NO SE PUDO REPLICAR')
+                logger.debug("🤝 Recurso devuelto")
 
-    
+            else:
+                logger.debug("🤝 Recurso NO devuelto")
+
+        else:
+            print("❌❌❌ NO SE PUDO REPLICAR!!!")
+      
     def migrate_data_cause_fall(self, pred_node_ip, succ_node_ip, coordinator_ip):
         pred_data_node = StaticDataNode(pred_node_ip)
         pred_data_node.load_data()
@@ -353,11 +356,11 @@ class StaticDataNode:
 
 
 
-        print(f"SELF.DATA => {self.data}")
+        # print(f"SELF.DATA => {self.data}")
         self.save_data(False)
-        print(f"SELF.REPLICATED_DATA => {self.replicated_data}")
+        # print(f"SELF.REPLICATED_DATA => {self.replicated_data}")
         self.save_data(True)
-        print(f"PRED.REPLICATED_DATA => {pred_data_node.replicated_data}")
+        # print(f"PRED.REPLICATED_DATA => {pred_data_node.replicated_data}")
         succ_data_node.save_data(True)
         pred_data_node.save_data(True)
                 
@@ -428,10 +431,10 @@ class StaticDataNode:
         path_without_DATA = os.path.normpath(ROOT + '/' + self.ip)
         
         os.makedirs(data_path, exist_ok=True)
-        print(f'DATA DE {self.ip}: {data_path}')
+        # print(f'DATA DE {self.ip}: {data_path}')
         replicated_data_path = os.path.normpath(ROOT + '/' + self.ip + '/' + 'REPLICATED_DATA')
         os.makedirs(replicated_data_path, exist_ok=True)
-        print(f'REP_DATA DE {self.ip}: {replicated_data_path}')
+        # print(f'REP_DATA DE {self.ip}: {replicated_data_path}')
         
         self.clean_folder(data_path)
         self.clean_folder(replicated_data_path)
@@ -444,9 +447,9 @@ class StaticDataNode:
         self.save_data(False)
         
         x = os.path.exists(path_without_DATA+'/'+'data.json')
-        print(f'DATA.JSON EXISTE: {x}')
+        # print(f'DATA.JSON EXISTE: {x}')
         x = os.path.exists(path_without_DATA+'/'+'replicated_data.json')
-        print(f'REP_DATA.JSON EXISTE: {x}')
+        # print(f'REP_DATA.JSON EXISTE: {x}')
 
 
     def remove_duplicates(self, path_to_del, path_to_verify, path_of_data=None):
