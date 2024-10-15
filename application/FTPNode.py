@@ -363,13 +363,16 @@ class FTPNode:
             
             for file in files:
                 self._handle_dele_command(file, os.path.normpath(os.path.dirname(file)))
+
             logger.debug("SALE DEL CICLO DE BORRAR")
             current_dir_hash = getShaRepr(current_dir)
-            find_response = find(f'{FIND_OWNER},{current_dir_hash}')
-            owner_ip = find_response[0]
-            successor_ip = find_response[1]
-            predecessor_ip = find_response[2]
-            if self.remove_directory(absolute_path, current_dir, owner_ip, successor_ip, predecessor_ip):
+            find_response = find(f'{FIND_OWNER},{current_dir_hash}').split(',')
+            owner_container_ip = find_response[0]
+            successor_container__ip = find_response[1]
+            predecessor_container_ip = find_response[2]
+
+            
+            if self.remove_filedata(absolute_path, current_dir, owner_container_ip, successor_container__ip, predecessor_container_ip) and self.remove_directory(absolute_path, current_dir, owner_ip, successor_ip, predecessor_ip):
                 logger.debug(f"handle_rmd_command -> {client_socket} XXX")
                 client_socket.send(f'250 {absolute_path} deleted\r\n'.encode('utf-8'))
                 logger.debug(f"handle_rmd_command -> SENT...")
@@ -386,7 +389,6 @@ class FTPNode:
             logger.debug('RMD -> RELEASE SENT...')
         else:
             logger.debug('RMD -> RELEASE SENT FAILED')
-        # no esta saliendo del RMD donde borra, ver eso.
 
     def _handle_stor_command(self, file_name: str, client_socket: socket.socket, current_dir):
         file_path = os.path.join(current_dir,file_name)
@@ -623,6 +625,11 @@ class FTPNode:
                 return False
 
     def remove_directory(self, absolute_path, current_dir, owner_ip, successor_ip, predecessor_ip):
+        logger.debug('start remove_directory')
+        logger.debug(f'owner_ip -> {owner_ip}')
+        logger.debug(f'successor_ip -> {successor_ip}')
+        logger.debug(f'predecessor_ip -> {predecessor_ip}')
+        
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner_ip, DATABASE_PORT))
 
@@ -636,6 +643,10 @@ class FTPNode:
 
     def remove_filedata(self, file_name, current_dir, owner_ip, successor_ip, predecessor_ip):
         logger.debug('start remove_filedata')
+        logger.debug(f'owner_ip -> {owner_ip}')
+        logger.debug(f'successor_ip -> {successor_ip}')
+        logger.debug(f'precessor_ip -> {predecessor_ip}')
+
         owner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         owner_socket.connect((owner_ip, DATABASE_PORT))
 
