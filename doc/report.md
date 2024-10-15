@@ -23,6 +23,7 @@ El sistema asegura la alta disponibilidad de los archivos mediante la replicaci�
 
 ## Comunicación entre Nodos
 La comunicación entre el nodo FTP y los nodos de datos se realiza a través de un puerto específico. Este puerto permite la transmisión de comandos y datos entre los nodos, asegurando que las solicitudes de los clientes puedan ser gestionadas de manera eficiente. A continuación, se presentan los comandos FTP disponibles en el sistema:
+
 * **CWD:** Cambia el directorio de trabajo actual.
 * **DELE** (Delete): Elimina un archivo.
 * **FEAT** (Features): Lista las características soportadas por el servidor.
@@ -45,7 +46,38 @@ El sistema permite la adición y sustracción dinámica de nodos sin afectar su 
 ## Evaluación del Sistema
 El rendimiento del sistema se evaluará utilizando herramientas estándar como FileZilla para asegurar su compatibilidad con los protocolos FTP tradicionales. Las pruebas incluirán la transferencia de archivos, la replicación de datos y la recuperación de nodos caídos, verificando que el sistema distribuido cumple con las expectativas de robustez y escalabilidad en un entorno de producción.
 
-## Cómo ejecutar la solución?
+## Despliegue y Ejecución
+
+El sistema está diseñado para ser desplegado y ejecutado utilizando Docker, lo que facilita su portabilidad y escalabilidad. Docker se utiliza para crear contenedores que contienen tanto el nodo FTP como los nodos de datos del anillo de Chord. Esto asegura que las dependencias del sistema estén correctamente gestionadas y que sea sencillo de ejecutar en diferentes entornos.
+
+Para ejecutar el proyecto, es necesario contar con Docker. Siguiendo estos pasos, podrás iniciar el entorno de ejecución:
+
+* Iniciar Docker
+* Descargar una imagen de Python: Se recomienda utilizar una imagen de Python con una versión slim. Esto se puede hacer con el siguiente comando:
+  
+  ``` docker pull python:3-slim ```
+  
+* Abrir una terminal interactiva de la imagen de Python utilizando el siguiente comando para ejecutar un contenedor de Python, montando el directorio del proyecto como volumen:
+  
+  ``` docker run --rm -it -v <path_del_proyecto>:/app python:3-slim /bin/bash ```
+  
+  ```<path_del_proyecto>```: Ruta del directorio donde se encuentra el código del proyecto.
+  
+* Navegar al directorio de la aplicación: Una vez dentro del contenedor, se accede al directorio de la aplicación con:
+
+  ```cd /app```
+  
+* Agregar un primer nodo: Para iniciar el primer nodo de datos de Chord, se ejecuta el siguiente comando:
+
+  ```python3 init_first_node.py```
+  
+* Agregar un segundo nodo: Para iniciar un segundo nodo, se ejecuta:
+
+  ```python3 init_secondary_node.py```
+  
+* Agregar el nodo que actua como servidor FTP: Para iniciar el servidor, se ejecuta:
+
+  ```python3 init_server.py```
 
 
 
