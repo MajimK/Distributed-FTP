@@ -112,20 +112,21 @@ class ChordNode:
         """
         # como puedo controlar esto aqui?
         if node is not None:
-            logger.debug("join: EL NODO VIENE ESPECIFICADO!")
+            logger.debug("⛓️ El nuevo nodo se unirá a otro")
             self.pred = None
             self.succ = node.find_successor(self.id)
             self.elector.adopt_coordinator(node.get_coordinator())
-            logger.debug(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
+            logger.debug(f"El sucesor asignado es {self.succ}")
             self.static_data_node.create_its_folder()
             self.succ.notify(self.ref)
             
             if self.succ.succ.id == self.succ.id:
-                logger.debug('There was one node...')
+                logger.debug('🫂 El nuevo nodo es el segundo de la red')
                 self.pred = self.succ
                 self.predspred = self.ref
                 self.succ.first_notify(self.ref)
         else:
+            logger.debug(f'☝🏻 {self.id} es el primer nodo de la red!')
             self.static_data_node.create_its_folder(True)
             self.succ = self.ref
             self.pred = None
@@ -140,38 +141,36 @@ class ChordNode:
         while True:
             if self.id != self.succ.id:
                 
-                logger.debug('stabilize: ESTABILIZANDO...')
-                logger.debug(f"stabilize: MI SUCESOR ES: {self.succ.id}")
-                logger.debug(f"SUCESOR VIVO: {self.succ.check_node()}")
+                logger.debug('⚖︎ Estabilizando...')
                 
                 if self.succ.check_node(): #the succ isn't dead
                     
-                    logger.debug("stabilize: MI SUCESOR NO ESTA MUERTO!!!")
+                    logger.debug(f"{self.ip} dice que su sucesor no está muerto")
                     
                     succ_predecessor = self.succ.pred
 
-                    logger.debug(f"stabilize: succ_predecessor ES: {succ_predecessor.id}")
+                    # logger.debug(f"stabilize: succ_predecessor ES: {succ_predecessor.id}")
 
                     if succ_predecessor.id != self.id:   #it's not itself
                         
-                        logger.debug("stabilize: NO SOY EL PREDECESOR DE MI SUCESOR\n")
+                        logger.debug(f"🚨 Red Inestable, {self.ip} no es el predecesor de su sucesor!\n")
 
                         if succ_predecessor and self._inbetween(succ_predecessor.id, self.id, self.succ.id):
                             if succ_predecessor.id != self.succ.id:
-                                logger.debug("[=X=] stabilize: HAY ALGUN NODO ENTRE MI SUCESOR ACTUAL Y YO.\n")
+                                logger.debug(f"{self.ip} dice que hay algún nodo entre su sucesor y él mismo.\n")
                             
                                 self.succ = succ_predecessor
                         self.succ.notify(self.ref)     
                     else:
-                        logger.debug('Stable network')
+                        logger.debug('⚖️ Red Estable')
 
                     if self.pred and self.pred.check_node():
                         self.predspred = self.pred.pred
 
                 else:
-                    logger.debug('Successor lost...')
+                    logger.debug('❌🔜 Sucesor perdido!')
 
-            logger.debug(f"[=X=] succ : {self.succ} pred {self.pred}\n")
+            logger.debug(f"🔜 succ: {self.succ} 🔙 pred {self.pred}\n")
             time.sleep(10)
 
 
@@ -181,7 +180,7 @@ class ChordNode:
         Args:
             node (ChordNodeReference): The new node
         """
-        logger.debug(f'in notify, my id: {self.id} my pred: {node.id}')
+        logger.debug(f'📝 Notificando a {self.id} que su predecesor es {node.id}')
         if node.id == self.id:
             pass
         else:
@@ -196,8 +195,9 @@ class ChordNode:
                     self.pred  = node
                     new_node_ip = node.ip
                     succ_ip = self.succ.ip
-                    print(f'SELF.IP -> {self.ip} SELF.PRED.IP -> {self.pred.ip} SELF.SUCC.IP -> {self.succ.ip}')
+                    # print(f'SELF.IP -> {self.ip} SELF.PRED.IP -> {self.pred.ip} SELF.SUCC.IP -> {self.succ.ip}')
                     with self.migration_lock:
+                        logger.debug(f'💾 Migrando datos por la llegada de un nuevo nodo')
                         self.static_data_node.migrate_data_to_new_node(new_node_ip, pred_ip, succ_ip, self.elector.coordinator)
        
         
@@ -205,7 +205,7 @@ class ChordNode:
     def notify_pred(self, node: 'ChordNodeReference'):
         """Exterior call to stabilize network."""
 
-        logger.debug(f'notify_pred: NOTIFICANDO AL PREDECESOR DE ID ES: {self.id}, ID DEL PREDECESOR: {self.pred.id} QUE SU SUCESOR SOY YO MISMO')
+        logger.debug(f'📝 Notificando a {self.id} que su sucesor es {node.id}')
         self.succ = node
 
     def first_notify(self, node: 'ChordNodeReference'):
@@ -218,6 +218,7 @@ class ChordNode:
         self.pred = node
         self.predspred = self.ref
         with self.migration_lock:
+            logger.debug(f'💾 Migrando datos por la llegada del segundo nodo de la red')
             self.static_data_node.migrate_data_one_node(node.ip, self.elector.coordinator)
 
     def fix_fingers(self):
@@ -228,14 +229,14 @@ class ChordNode:
             try:
                 if self.pred and not self.pred.check_node():
 
-                    logger.debug("Lost predecessor!!!! \n")
+                    logger.debug("❌🔙 Predecesor perdido \n")
                     if self.predspred.check_node():  # predspred exist
                         self.pred = self.predspred
                         self.predspred = self.predspred.pred
                         # aqui puedo replicar normal, pero fijarse que ya estoy cambiando el ip de pred.
                         
                     else:
-                        logger.debug('Predpred is also lost')
+                        # logger.debug('Predpred is also lost')
                         self.pred = self.find_pred(self.predspred.id)
                         self.predspred = self.pred.pred
                         # analizar casos aqui, porque si no tengo pred_pred hay que replicar de otra forma.
@@ -248,6 +249,7 @@ class ChordNode:
 
                     pred_ip = self.pred.ip if self.pred is not None else self.ip
                     with self.migration_lock:
+                        logger.debug(f'💾 Migrando datos por la caída de un nodo')
                         self.static_data_node.migrate_data_cause_fall(pred_ip, self.succ.ip, self.elector.coordinator)
 
             except Exception:
@@ -277,16 +279,16 @@ class ChordNode:
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.bind(('',BROADCAST_PORT))
-        print(f"start_broadcast_server: COMIENZA A ESCUCHAR")
+        logger.debug(f"🎧 Escuchando por broadcast...")
         
         while True:
             data, addr = s.recvfrom(1024)
             
             data = data.decode().split(',')
-            logger.debug(f'data is {data}')
+            # logger.debug(f'data is {data}')
 
             operation_str = data[0]
-            logger.debug(f'operation_str is {operation_str}')
+            # logger.debug(f'operation_str is {operation_str}')
             if not_self_discover(operation_str):
                 response = ''
                 if operation_str == FIND_COORDINATOR:
@@ -299,40 +301,40 @@ class ChordNode:
                     succ = owner.succ
                     pred = owner.pred
                     response = f'{owner.ip},{succ.ip},{pred.ip}'
-                    logger.debug(f'response after FIND_OWNER is {response}')
+                    # logger.debug(f'response after FIND_OWNER is {response}')
 
                 ip,port = addr
                 try:
-                    print(f'Response to find is {response}')
+                    # print(f'Response to find is {response}')
                     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                        logger.debug(f'Sender ip: {ip} -- Sender port: {port}')
+                        # logger.debug(f'Sender ip: {ip} -- Sender port: {port}')
                         sock.sendto(response.encode('utf-8'), (ip, port))
                 except BrokenPipeError:
                     logger.debug(f'The message was sent! (not by {self.ip})')
                 continue
 
             if addr[0] == self.ip:
-                print("start_broadcast_server: EL MENSAJE ES DE EL MISMO")
+                # print("start_broadcast_server: EL MENSAJE ES DE EL MISMO")
                 continue
             else:
-                print(f"start_broadcast_server: MENSAJE RECIBIDO DESDE: {addr[0]}")
+                # print(f"start_broadcast_server: MENSAJE RECIBIDO DESDE: {addr[0]}")
                 operation = int(data[0])
                 
                 if operation == DISCOVER:
-                    print("start_broadcast_server: DISCOVER OPERATION")
+                    # print("start_broadcast_server: DISCOVER OPERATION")
                     sender_ip = data[1]
                     sender_port = int(data[2])
                     
-                    print(f'start_broadcast_server: {self.ip} MANDA EL MENSAJE HACIA {sender_ip}:{sender_port}')
+                    # print(f'start_broadcast_server: {self.ip} MANDA EL MENSAJE HACIA {sender_ip}:{sender_port}')
                     
                     response = f'{ENTRY_POINT},{self.ip}'
 
                 try:
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                         sock.connect((sender_ip, sender_port))
-                        print('CONECTA CON EXITO')
+                        # print('CONECTA CON EXITO')
                         sock.sendall(response.encode('utf-8'))
-                        print(f"start_broadcast_server: MENSAJE {response} ENVIADO CON EXITO HACIA {sender_ip}:{sender_port}")
+                        # logger.debug(f"Mensa {response} ENVIADO CON EXITO HACIA {sender_ip}:{sender_port}")
                 except Exception as e:
                     print(e)
 
@@ -389,7 +391,7 @@ class ChordNode:
         if data_resp:
             response = f'{data_resp.id},{data_resp.ip}'.encode()
             conn.sendall(response)
-            logger.debug(f"data_recieve: RESPUESTA ENVIADA\n")
+            # logger.debug(f"data_recieve: RESPUESTA ENVIADA\n")
         conn.close()
 
 
