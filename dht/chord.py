@@ -141,7 +141,7 @@ class ChordNode:
         while True:
             if self.id != self.succ.id:
                 
-                logger.debug('⚖︎ Estabilizando...')
+                logger.debug('⚖️ Estabilizando...')
                 
                 if self.succ.check_node(): #the succ isn't dead
                     
@@ -231,12 +231,14 @@ class ChordNode:
 
                     logger.debug("❌🔙 Predecesor perdido \n")
                     if self.predspred.check_node():  # predspred exist
+                        logger.debug('✅🔙🔙 Predpred existe')
+
                         self.pred = self.predspred
                         self.predspred = self.predspred.pred
                         # aqui puedo replicar normal, pero fijarse que ya estoy cambiando el ip de pred.
                         
                     else:
-                        # logger.debug('Predpred is also lost')
+                        logger.debug('❌🔙🔙 Predpred también está perdido')
                         self.pred = self.find_pred(self.predspred.id)
                         self.predspred = self.pred.pred
                         # analizar casos aqui, porque si no tengo pred_pred hay que replicar de otra forma.

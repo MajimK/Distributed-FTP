@@ -288,9 +288,7 @@ class StaticDataNode:
 
         else:
             print("❌❌❌ NO SE PUDO REPLICAR!!!")
-
-
-    
+      
     def migrate_data_cause_fall(self, pred_node_ip, succ_node_ip, coordinator_ip):
         pred_data_node = StaticDataNode(pred_node_ip)
         pred_data_node.load_data()
@@ -359,12 +357,12 @@ class StaticDataNode:
 
 
         # print(f"SELF.DATA => {self.data}")
-        # self.save_data(False)
+        self.save_data(False)
         # print(f"SELF.REPLICATED_DATA => {self.replicated_data}")
-        # self.save_data(True)
+        self.save_data(True)
         # print(f"PRED.REPLICATED_DATA => {pred_data_node.replicated_data}")
-        # succ_data_node.save_data(True)
-        # pred_data_node.save_data(True)
+        succ_data_node.save_data(True)
+        pred_data_node.save_data(True)
                 
 
 

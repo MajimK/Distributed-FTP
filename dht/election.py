@@ -27,19 +27,20 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
     
     def adopt_coordinator(self, coordinator: str):
         self.coordinator = coordinator
-        # print(f"adopt_coordinator: ADOPTA AL COORDINADOR {self.coordinator}")
+        logger.debug(f"🙇🏻‍♂️ El coordinador es {self.coordinator}")
         if coordinator == self.ip:
             self.is_coordinator = True
 
     def start_election(self):
         t = threading.Thread(target=send_by_broadcast,args=(f'{ELECTION}',True, ELECTOR_PORT))
         t.start()
-        # logger.debug(f"start_election: ELECCION COMENZADA POR {self.id}")
+        logger.debug(f"🗳️ Elecciones comenzadas por {self.id}")
+
 
     def end_election(self):
         t = threading.Thread(target=send_by_broadcast, args=(f'{COORDINATOR}',True, ELECTOR_PORT))
         t.start()
-        # logger.debug("end_election: ELECCION TERMINADA")
+        logger.debug(f"😎 Elecciones terminadas, coordinador: {self.coordinator}")
 
     def process_election(self):
         time.sleep(0.5)
@@ -67,7 +68,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                     self.is_in_election = False
             else: 
                 pass
-                # logger.debug(f'elect: EL COORDINADOR ES: {self.coordinator}')
+                # logger.debug(f'😎 Coordinador: {self.coordinator}')
             
             time.sleep(0.5)
 
@@ -108,10 +109,12 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                         
                     elif operation == COORDINATOR:
                         # logger.debug(f"start_server_election: MENSAJE COORDINATOR ENVIADO POR {ip} Y RECIBIDO POR {self.ip}")
+                        logger.debug('📭 Recibido el mensaje COORDINATOR')
                         if not bully(self.ip, ip) and (not self.coordinator or bully(ip, self.coordinator)):
                             self.coordinator = ip
                             self.is_in_election = False
                             self.is_coordinator = False if self.ip == ip else True 
+                            logger.debug(f'🙇🏻‍♂️ El coordinador es {ip}')
 
             except Exception as e:
                 pass
