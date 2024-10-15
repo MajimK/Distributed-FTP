@@ -1,21 +1,20 @@
 import socket
-from utils import getShaRepr
-import logging
-from operations import *
-from consts import PORT, FTP_PORT
+from utils.utils_functions import getShaRepr, logger
+from utils.operations import *
+from utils.consts import DEFAULT_PORT, FTP_PORT
 # logger configuration
 #### here ####
 
 # no necesito el id en la referencia del nodo, es identificable perfectamente por el puerto y el ip
 # esto seria lo que es el nodo como tal de Chord, o sea, lo que se encierra en el cuadrado en los esquemas que he hecho
 class ChordNodeReference:
-    def __init__(self, ip: str, port: int = PORT, db_port: int = FTP_PORT ):
+    def __init__(self, ip: str, port: int = DEFAULT_PORT, db_port: int = FTP_PORT ):
         self.id = getShaRepr(ip)
         self.ip = ip
         self.port = port
 
 
-    def _send_data(self, op: int, data: str = None, is_db_port = False):
+    def _send_data(self, op: int, data: str = None):
         """Internal function to send data to referenced node (self)
 
         Args:
@@ -25,18 +24,31 @@ class ChordNodeReference:
         Returns:
             bytes: Answer code 
         """
-        port = self.port if not is_db_port else FTP_PORT
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 print(f'sending {op}')
-                s.connect((self.ip, port))
+                s.connect((self.ip, DEFAULT_PORT))
                 s.sendall(f'{op},{data}'.encode('utf-8'))
-                return s.recv(1024)
+                response = s.recv(1024)
+                if op == MKD:
+                    print("_send_data: RESPONSE CHORD_NODE_REFERENCE: ", response)
+                return response
         except Exception as e:
             print(f"Error sending data: {e}")
             return b''
         
-    
+    def _send_data_ftp(self, op: int, data: str = None):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                print(f'sending {op}')
+                s.connect((self.ip, FTP_PORT))
+                s.sendall(f'{op},{data}'.encode('utf-8'))                
+        except Exception as e:
+            print(f"Error sending data: {e}")
+            return b''
+        
+
+
     def find_successor(self, id: int) -> 'ChordNodeReference':
         """Gets Chord node reference of the given node successor 
 
@@ -122,7 +134,6 @@ class ChordNodeReference:
         ip =response[1]
         return ChordNodeReference(ip, self.port)
     
-    ### FALTA RETRIEVE KEY & STORE KEY
 
     def __str__(self) -> str:
         return f'{self.id},{self.ip},{self.port}'
@@ -133,16 +144,17 @@ class ChordNodeReference:
 
 
 
-    ###------- DATA ACCESS -------###
-    def store_directory(self,directory:str):
-        response = self._send_data(STORE_DIRECTORY,directory,True).decode()
-        return response
+    ###------- FTP -------###
+    def mkd(self, route:str):
+        logger.debug(f'CHORD_NODE_REFERENCE: MKD {route}')
+        self._send_data_ftp(f'{MKD} ' f'{route}')
     
-    def delete_directory(self, directory: str):
-        response = self._send_data(DELETE_DIRECTORY, directory, True).decode()
-        return response
-
-    def add_file(self, directory_name:str, file_name:str):
-        response = self._send_data(ADD_FILE,f'{directory_name},{file_name}',True).decode()
-        return response
+    def stor(self, file_name:str):
+        self._send_data_ftp(f'{STOR} ' f'{file_name}')
+    
+    def rmd(self, dir_name: str):
+        self._send_data_ftp(f'{RMD} ' f'{dir_name}')
+    
+    def list(self):
+        self._send_data_ftp(f'{LIST}')
 
