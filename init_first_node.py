@@ -10,7 +10,7 @@ if __name__ == "__main__":
     # Get current IP
     ip = socket.gethostbyname(socket.gethostname())
     
-    print(f"[IP]: {ip} --- [HASH]: {getShaRepr(ip)}")
+    print(f"🏠 [IP]: {ip} --- [HASH]: {getShaRepr(ip)}")
     
     node = ChordNode(ip)
     print(f"[IP]: {ip}")

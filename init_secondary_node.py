@@ -10,7 +10,7 @@ def getShaRepr(data: str):
 if __name__ == "__main__":
 
     ip = socket.gethostbyname(socket.gethostname())
-    print(f"[IP]: {ip} --- [HASH]: {getShaRepr(ip)}")
+    print(f"🏠 [IP]: {ip} --- [HASH]: {getShaRepr(ip)}")
     
     target_ip = SelfDiscovery(ip).find()
     node = ChordNode(ip)

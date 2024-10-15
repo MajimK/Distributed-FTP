@@ -476,7 +476,7 @@ class FTPNode:
         pass
 
     def start_ftp_server(self):
-        logger.debug("Start server!")
+        print("🖥️ Servidor iniciado!")
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
