@@ -1,18 +1,19 @@
 import socket, threading
-from utils import send_by_broadcast, logger, bully
+from utils.utils_functions import send_by_broadcast, logger, bully
 import time
-from consts import BROADCAST_PORT
+from utils.consts import ELECTOR_PORT
+from dht.coordinator import Coordinator
 #--- messages region ---#
 ELECTION = 0
 COORDINATOR = 1
 FEEDBACK = 2
-PORT = 8002
 # no necesito el id porque cada nodo tiene un elector nodo que le corresponde y todos tienen la propiedad is_coordinator
 class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo o al menos una referencia a el (NO?) al que corresponde
     def __init__(self, id: int) -> None:
         self.id = id   # ahora mismo el id del ElectorNode coincide con el otro id
         self.ip = socket.gethostbyname(socket.gethostname())
-        self.coordinator = None   # no estoy seguro que necesite esto
+        self.coordinator = None   
+        self.coordinator_instance: Coordinator = Coordinator(self.ip)
         self.is_coordinator = False
         self.is_in_election = False
 
@@ -22,6 +23,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
     
     def coordinator_loss(self):
         self.coordinator = None
+        self.coordinator_instance = None
     
     def adopt_coordinator(self, coordinator: str):
         self.coordinator = coordinator
@@ -30,12 +32,12 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
             self.is_coordinator = True
 
     def start_election(self):
-        t = threading.Thread(target=send_by_broadcast,args=(f'{ELECTION}',True, PORT))
+        t = threading.Thread(target=send_by_broadcast,args=(f'{ELECTION}',True, ELECTOR_PORT))
         t.start()
         # logger.debug(f"start_election: ELECCION COMENZADA POR {self.id}")
 
     def end_election(self):
-        t = threading.Thread(target=send_by_broadcast, args=(f'{COORDINATOR}',True, PORT))
+        t = threading.Thread(target=send_by_broadcast, args=(f'{COORDINATOR}',True, ELECTOR_PORT))
         t.start()
         # logger.debug("end_election: ELECCION TERMINADA")
 
@@ -74,7 +76,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        s.bind(('', PORT))    # se vincula a todas las ips disponibles que usan ese puerto
+        s.bind(('', ELECTOR_PORT))    # se vincula a todas las ips disponibles que usan ese puerto
 
         while True:
             try:
@@ -95,7 +97,7 @@ class BroadcastElectorNode:   #veamos esto como que tiene el id del proceso/nodo
                         if bully(self.ip, ip):
                             # it considers itself candidate
                             socket_sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                            socket_sender.sendto(f'{FEEDBACK}', (ip,PORT))
+                            socket_sender.sendto(f'{FEEDBACK}', (ip,ELECTOR_PORT))
                         self.start_election()
 
                     elif operation == FEEDBACK:

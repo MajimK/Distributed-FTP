@@ -1,15 +1,17 @@
 import socket
 import threading
 import time
-from utils import *
+from utils.utils_functions import *
 from communication.chord_node_reference import ChordNodeReference
 from dht.election import BroadcastElectorNode
-from operations import *
-from consts import *
+from utils.operations import *
+from utils.consts import *
+from data_access.StaticDataNode import StaticDataNode
 from data_access.DataNode import DataNode
+from dht.coordinator import Coordinator
 
 class ChordNode:
-    def __init__(self, ip: str, port: int = 8001, m: int = 160):
+    def __init__(self, ip: str, port: int = DEFAULT_PORT, m: int = 160):
         # el parametro election es solo para que tenga en cuenta todo lo de coordinacion.
         self.ip = ip
         self.id = getShaRepr(str(ip))
@@ -17,10 +19,14 @@ class ChordNode:
         self.ref = ChordNodeReference(self.ip, self.port)
         self.succ: ChordNodeReference = self.ref  # Initial successor is itself
         self.pred: ChordNodeReference = None  # Initially no predecessor
+        self.predspred: ChordNodeReference = None
         self.m = m  # Number of bits in the hash/key space
         self.finger = [self.ref] * self.m  # Finger table
         self.next = 0  # Finger table index to fix next
         self.elector: BroadcastElectorNode = BroadcastElectorNode(self.id)
+        self.static_data_node: StaticDataNode = StaticDataNode(self.ip)
+        self.data_node: DataNode = DataNode(self.ip)
+        self.migration_lock = threading.Lock()
         self._start_threads()
 
 
@@ -104,20 +110,28 @@ class ChordNode:
         Args:
             node (ChordNodeReference): The node
         """
-        if node:
+        # como puedo controlar esto aqui?
+        if node is not None:
             logger.debug("join: EL NODO VIENE ESPECIFICADO!")
             self.pred = None
             self.succ = node.find_successor(self.id)
             self.elector.adopt_coordinator(node.get_coordinator())
-            print(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
+            logger.debug(f"join: EL SUCESOR QUE LE DIO JOIN ES: {self.succ}")
+            self.static_data_node.create_its_folder()
             self.succ.notify(self.ref)
             
             if self.succ.succ.id == self.succ.id:
-                self.succ.first_notify(self.ref)
+                logger.debug('There was one node...')
                 self.pred = self.succ
+                self.predspred = self.ref
+                self.succ.first_notify(self.ref)
         else:
+            self.static_data_node.create_its_folder(True)
             self.succ = self.ref
             self.pred = None
+            self.predspred = None
+            self.elector.coordinator = self.ip
+
 
 
     
@@ -148,7 +162,15 @@ class ChordNode:
                             
                                 self.succ = succ_predecessor
                         self.succ.notify(self.ref)     
-                              
+                    else:
+                        logger.debug('Stable network')
+
+                    if self.pred and self.pred.check_node():
+                        self.predspred = self.pred.pred
+
+                else:
+                    logger.debug('Successor lost...')
+
             logger.debug(f"[=X=] succ : {self.succ} pred {self.pred}\n")
             time.sleep(10)
 
@@ -165,9 +187,18 @@ class ChordNode:
         else:
             if self.pred is None:
                 self.pred = node
+                self.predspred = node.pred
+
             elif node.check_node():
                 if self._inbetween(node.id, self.pred.id, self.id):
+                    self.predspred = self.pred
+                    pred_ip = self.pred.ip
                     self.pred  = node
+                    new_node_ip = node.ip
+                    succ_ip = self.succ.ip
+                    print(f'SELF.IP -> {self.ip} SELF.PRED.IP -> {self.pred.ip} SELF.SUCC.IP -> {self.succ.ip}')
+                    with self.migration_lock:
+                        self.static_data_node.migrate_data_to_new_node(new_node_ip, pred_ip, succ_ip, self.elector.coordinator)
        
         
 
@@ -185,6 +216,9 @@ class ChordNode:
         """
         self.succ = node
         self.pred = node
+        self.predspred = self.ref
+        with self.migration_lock:
+            self.static_data_node.migrate_data_one_node(node.ip, self.elector.coordinator)
 
     def fix_fingers(self):
         pass
@@ -194,43 +228,35 @@ class ChordNode:
             try:
                 if self.pred and not self.pred.check_node():
 
-                    logger.debug("check_predecessor: PREDECESOR PERDIDO\n")
-                    self.pred = self.find_pred(self.pred.id)
+                    logger.debug("Lost predecessor!!!! \n")
+                    if self.predspred.check_node():  # predspred exist
+                        self.pred = self.predspred
+                        self.predspred = self.predspred.pred
+                        # aqui puedo replicar normal, pero fijarse que ya estoy cambiando el ip de pred.
+                        
+                    else:
+                        logger.debug('Predpred is also lost')
+                        self.pred = self.find_pred(self.predspred.id)
+                        self.predspred = self.pred.pred
+                        # analizar casos aqui, porque si no tengo pred_pred hay que replicar de otra forma.
+
                     self.pred.notify_pred(self.ref)
 
+                    if self.pred.id == self.id:
+                        self.pred = None
+                        self.predspred = None
 
-            except Exception as e:
-                logger.debug(f"[XXX] check_predecessor: ENTRA A LA EXCEPCION: {e}\n")
+                    pred_ip = self.pred.ip if self.pred is not None else self.ip
+                    with self.migration_lock:
+                        self.static_data_node.migrate_data_cause_fall(pred_ip, self.succ.ip, self.elector.coordinator)
+
+            except Exception:
                 self.pred = None
-            time.sleep(10)
+                self.succ = self.ref
 
+            time.sleep(15)
 
-    def store_key(self, key: str, value: str):
-        """Sotres key-value pair and replicates to the succ
-
-        Args:
-            key (str): The key
-            value (str): The value
-        """
-        key_hash = getShaRepr(key)
-        node = self.find_succ(key_hash)
-        node.store_key(key, value)
-        self.data[key] = value  
-        self.succ.store_key(key, value)
-
-
-    def retrieve_key(self, key: str) -> str:
-        """Retrieve key method to get a value for a given key.
-
-        Args:
-            key (str): The key
-
-        Returns:
-            str: The respective value
-        """
-        key_hash = getShaRepr(key)
-        node = self.find_succ(key_hash)
-        return node.retrieve_key(key)
+           
 
 
     def start_server(self):
@@ -255,13 +281,41 @@ class ChordNode:
         
         while True:
             data, addr = s.recvfrom(1024)
+            
+            data = data.decode().split(',')
+            logger.debug(f'data is {data}')
+
+            operation_str = data[0]
+            logger.debug(f'operation_str is {operation_str}')
+            if not_self_discover(operation_str):
+                response = ''
+                if operation_str == FIND_COORDINATOR:
+                    response = self.elector.coordinator
+
+                    
+                elif operation_str == FIND_OWNER:
+                    hash = int(data[1])
+                    owner = self.find_succ(hash)
+                    succ = owner.succ
+                    pred = owner.pred
+                    response = f'{owner.ip},{succ.ip},{pred.ip}'
+                    logger.debug(f'response after FIND_OWNER is {response}')
+
+                ip,port = addr
+                try:
+                    print(f'Response to find is {response}')
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                        logger.debug(f'Sender ip: {ip} -- Sender port: {port}')
+                        sock.sendto(response.encode('utf-8'), (ip, port))
+                except BrokenPipeError:
+                    logger.debug(f'The message was sent! (not by {self.ip})')
+                continue
 
             if addr[0] == self.ip:
                 print("start_broadcast_server: EL MENSAJE ES DE EL MISMO")
                 continue
             else:
                 print(f"start_broadcast_server: MENSAJE RECIBIDO DESDE: {addr[0]}")
-                data = data.decode().split(',')
                 operation = int(data[0])
                 
                 if operation == DISCOVER:
@@ -276,6 +330,7 @@ class ChordNode:
                 try:
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                         sock.connect((sender_ip, sender_port))
+                        print('CONECTA CON EXITO')
                         sock.sendall(response.encode('utf-8'))
                         print(f"start_broadcast_server: MENSAJE {response} ENVIADO CON EXITO HACIA {sender_ip}:{sender_port}")
                 except Exception as e:
@@ -292,8 +347,8 @@ class ChordNode:
         """
         data_resp = None
         option = int(data[0])
-        logger.debug(f'receive {option} from {data[1]}')
-        logger.debug(f'data: {data}')
+        # logger.debug(f'receive {option} from {data[1]}')
+        # logger.debug(f'data: {data}')
 
         if option == FIND_SUCCESSOR:
             id = int(data[1])
@@ -319,7 +374,7 @@ class ChordNode:
             self.notify_pred(ChordNodeReference(ip, self.port))
 
         elif option == CHECK_NODE:
-            data_resp =  self.ref
+            data_resp = self.ref
 
         elif option == FIRST_NOTIFY:
             ip = data[2]
@@ -328,6 +383,7 @@ class ChordNode:
         elif option == GET_COORDINATOR:
             coord_ip = self.elector.get_coordinator()
             data_resp = ChordNodeReference(coord_ip)
+
 
         # Send response
         if data_resp:

@@ -67,18 +67,18 @@ def close_connection(sock):
 
 if __name__ == "__main__":
     host = 'localhost'  # Reemplaza con la dirección de tu servidor FTP
-    username = 'Kevin'  # Reemplaza con tu nombre de usuario
-    password = 'Kevin'  # Reemplaza con tu contraseña
+    # username = 'Kevin'  # Reemplaza con tu nombre de usuario
+    # password = 'Kevin'  # Reemplaza con tu contraseña
 
     ftp_sock = connect_to_ftp_server(host)
-    login(ftp_sock, username, password)
+    # login(ftp_sock, username, password)
     
-    print("Listando archivos en el directorio actual:")
-    list_files(ftp_sock)
+    # print("Listando archivos en el directorio actual:")
+    # list_files(ftp_sock)
 
-    filename_to_download = input('Archivo a descargar')  # Reemplaza con el nombre del archivo que quieres descargar
-    print(f"Descargando archivo {filename_to_download}")
-    download_file(ftp_sock, filename_to_download)
+    # filename_to_download = input('Archivo a descargar')  # Reemplaza con el nombre del archivo que quieres descargar
+    # print(f"Descargando archivo {filename_to_download}")
+    # download_file(ftp_sock, filename_to_download)
 
     filename_to_upload = 'upload_example.txt'  # Reemplaza con el nombre del archivo que quieres subir
     print(f"Subiendo archivo {filename_to_upload}")
