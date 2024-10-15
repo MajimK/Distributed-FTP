@@ -1,5 +1,6 @@
 ## FTP Distribuido
 Autores:
+
 Jan Carlos Pérez González (C412)
 
 Kevin Majim Ortega Álvarez (C412)
