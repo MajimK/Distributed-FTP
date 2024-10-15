@@ -1,9 +1,8 @@
 ## FTP Distribuido
-Autores:
 
-Jan Carlos Pérez González (C412)
+  -Jan Carlos Pérez González (C412)
 
-Kevin Majim Ortega Álvarez (C412)
+  -Kevin Majim Ortega Álvarez (C412)
 
 ## Problemática:
 En el mundo actual de la información digital, la gestión eficiente de archivos y la transferencia de datos son cruciales para el éxito de cualquier organización. Los protocolos de transferencia de archivos, como el FTP (File Transfer Protocol), han sido ampliamente utilizados para este propósito. Sin embargo, las necesidades de las empresas modernas han superado las capacidades de los servidores FTP tradicionales, especialmente en escenarios que requieren un alto rendimiento, escalabilidad y resistencia. 
