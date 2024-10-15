@@ -147,12 +147,14 @@ class ChordNodeReference:
     ###------- FTP -------###
     def mkd(self, route:str):
         logger.debug(f'CHORD_NODE_REFERENCE: MKD {route}')
-        self._send_data_ftp(f'{MKD}',f'{route}')
+        self._send_data_ftp(f'{MKD} ' f'{route}')
     
     def stor(self, file_name:str):
-        self._send_data_ftp(f'{STOR}',f'{file_name}')
+        self._send_data_ftp(f'{STOR} ' f'{file_name}')
     
     def rmd(self, dir_name: str):
-        self._send_data_ftp(f'{RMD}',f'{dir_name}')
+        self._send_data_ftp(f'{RMD} ' f'{dir_name}')
     
+    def list(self):
+        self._send_data_ftp(f'{LIST}')
 
